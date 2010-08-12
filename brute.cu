@@ -13,7 +13,7 @@
 
 void bruteRangeCount(matrix x, matrix q, real *ranges, int *cnts){
   matrix dx, dq;
-  real* dranges;
+  real *dranges;
   int *dcnts;
   
   copyAndMove(&dx, &x);
@@ -60,8 +60,8 @@ void bruteSearch(matrix x, matrix q, int *NNs){
   cudaFree(dMinIDs);
   cudaFree(dx.mat);
   cudaFree(dq.mat);
-
 }
+
 
 void bruteCPU(matrix X, matrix Q, int *NNs){
   real *dtoNNs; 

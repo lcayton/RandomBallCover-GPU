@@ -43,9 +43,6 @@ void rbc(matrix x, matrix q, int numReps, int s, int *NNs){
 
   qID = (int*)calloc(PAD(m+(BLOCK_SIZE-1)*pnr),sizeof(*qID));
 
-  for(i=0;i<m;i++)
-    qID[i]=i;
-
   cM.mat = (char*)calloc(pnr*pnr,sizeof(*cM.mat));
   cM.r=numReps; cM.c=numReps; cM.pr=pnr; cM.pc=pnr; cM.ld=cM.pc;
 
@@ -290,8 +287,7 @@ void buildQMap(matrix q, int *qID, int *repIDs, int numReps, int *compLength){
   int n=q.r;
   int i;
   int *gS; //groupSize
-  int *yID;
-
+  
   gS = (int*)calloc(numReps+1,sizeof(*gS));
   
   for( i=0; i<n; i++ )
@@ -304,21 +300,14 @@ void buildQMap(matrix q, int *qID, int *repIDs, int numReps, int *compLength){
   
   *compLength = gS[numReps];
   
-  yID = (int*)calloc((*compLength),sizeof(*yID));
   for( i=0; i<(*compLength); i++ )
-    yID[i]=DUMMY_IDX;
+    qID[i]=DUMMY_IDX;
   
-
   for( i=0; i<n; i++ ){
-    yID[gS[repIDs[i]]]=qID[i];
+    qID[gS[repIDs[i]]]=i;
     gS[repIDs[i]]++;
   }
 
-  for( i=0; i<(*compLength); i++ ){
-    qID[i]=yID[i];
-  }
-  
-  free(yID);
   free(gS);
 }
 

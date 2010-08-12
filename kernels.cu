@@ -191,14 +191,6 @@ __global__ void nnKernel(const matrix Q, const matrix X, real *dMins, int *dMinI
 }
 
 
-
-
-
-
-
-
-
-
 __device__ void dist1Kernel(const matrix Q, const matrix X, matrix D){
   int c, i, j;
 
@@ -232,6 +224,7 @@ __device__ void dist1Kernel(const matrix Q, const matrix X, matrix D){
   D.mat[ IDX( qB+q, xB+x, D.ld ) ] = ans;
 
 }
+
 
 
 __global__ void findRangeKernel(matrix D, real *ranges, int cntWant){

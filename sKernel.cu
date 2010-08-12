@@ -47,8 +47,7 @@ __global__ void sumKernel(charMatrix in, intMatrix sum, intMatrix sumaux, int n)
       t = ssum[ off*(2*id+1)-1 ];
       ssum[ off*(2*id+1)-1 ] = ssum[ off*(2*id+2)-1 ];
       ssum[ off*(2*id+2)-1 ] += t;
-    }
-    
+    }   
   }
 
   __syncthreads();
