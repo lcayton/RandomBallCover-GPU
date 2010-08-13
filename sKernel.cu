@@ -129,6 +129,8 @@ void sumWrap(charMatrix in, intMatrix sum){
   
   sumKernel<<<grid,block>>>(in, sum, dAux, n);
   cudaThreadSynchronize();
+
+  //While(){}
   grid.x=1;
 
   sumKernelI<<<grid,block>>>(dAux, dAux, dDummy, numScans);

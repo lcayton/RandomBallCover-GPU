@@ -8,9 +8,24 @@
 
 void dist1Wrap(matrix dq, matrix dx, matrix dD){
   dim3 block(BLOCK_SIZE,BLOCK_SIZE);
-  dim3 grid(dx.pr/BLOCK_SIZE,dq.pr/BLOCK_SIZE);
+  dim3 grid;
   
-  dist1Kernel<<<grid,block>>>(dq,dx,dD);
+  int todoX, todoY, numDoneX, numDoneY;
+
+  numDoneX = 0;
+  while ( numDoneX < dx.pr ){
+    todoX = min( dx.pr - numDoneX, MAX_BS*BLOCK_SIZE );
+    grid.x = todoX/BLOCK_SIZE;
+    numDoneY = 0;
+    while( numDoneY < dq.pr ){
+      todoY = min( dq.pr - numDoneY, MAX_BS*BLOCK_SIZE );
+      grid.y = todoY/BLOCK_SIZE;
+      dist1Kernel<<<grid,block>>>(dq, numDoneY, dx, numDoneX, dD);
+      numDoneY += todoY;
+    }
+    numDoneX += todoX;
+  }
+  
   cudaThreadSynchronize();
 }
 
@@ -20,14 +35,31 @@ void findRangeWrap(matrix dD, real *dranges, int cntWant){
   dim3 grid(1,4*(dD.pr/BLOCK_SIZE));
 
   findRangeKernel<<<grid,block>>>(dD,dranges,cntWant);
+
+  
   cudaThreadSynchronize();
 }
 
 void rangeSearchWrap(matrix dD, real *dranges, charMatrix dir){
   dim3 block(BLOCK_SIZE,BLOCK_SIZE);
   dim3 grid(dD.pc/BLOCK_SIZE,dD.pr/BLOCK_SIZE);
+
+  int todoX, todoY, numDoneX, numDoneY;
   
-  rangeSearchKernel<<<grid,block>>>(dD,dranges,dir);
+  numDoneX = 0;
+  while ( numDoneX < dD.pc ){
+    todoX = min( dD.pc - numDoneX, MAX_BS*BLOCK_SIZE );
+    grid.x = todoX/BLOCK_SIZE;
+    numDoneY = 0;
+    while( numDoneY < dD.pr ){
+      todoY = min( dD.pr - numDoneY, MAX_BS*BLOCK_SIZE );
+      grid.y = todoY/BLOCK_SIZE;
+      rangeSearchKernel<<<grid,block>>>(dD, numDoneX, numDoneY, dranges, dir);
+      numDoneY += todoY;
+    }
+    numDoneX += todoX;
+  }
+
   cudaThreadSynchronize();
 }
 

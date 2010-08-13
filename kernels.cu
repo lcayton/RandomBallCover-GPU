@@ -191,12 +191,12 @@ __global__ void nnKernel(const matrix Q, const matrix X, real *dMins, int *dMinI
 }
 
 
-__device__ void dist1Kernel(const matrix Q, const matrix X, matrix D){
+__device__ void dist1Kernel(const matrix Q, int qStart, const matrix X, int xStart, matrix D){
   int c, i, j;
 
-  int qB = blockIdx.y*BLOCK_SIZE;
+  int qB = blockIdx.y*BLOCK_SIZE + qStart;
   int q  = threadIdx.y;
-  int xB = blockIdx.x*BLOCK_SIZE;
+  int xB = blockIdx.x*BLOCK_SIZE + xStart;
   int x = threadIdx.x;
 
   real ans=0;
@@ -323,9 +323,9 @@ __global__ void findRangeKernel(matrix D, real *ranges, int cntWant){
 }
 
 
-__global__ void rangeSearchKernel(matrix D, real *ranges, charMatrix ir){
-  int col = blockIdx.x*BLOCK_SIZE + threadIdx.x;
-  int row = blockIdx.y*BLOCK_SIZE + threadIdx.y;
+__global__ void rangeSearchKernel(matrix D, int xOff, int yOff, real *ranges, charMatrix ir){
+  int col = blockIdx.x*BLOCK_SIZE + threadIdx.x + xOff;
+  int row = blockIdx.y*BLOCK_SIZE + threadIdx.y + yOff;
 
   ir.mat[IDX( row, col, ir.ld )] = D.mat[IDX( row, col, D.ld )] < ranges[row];
 

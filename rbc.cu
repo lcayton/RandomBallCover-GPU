@@ -175,7 +175,7 @@ void build(const matrix dx, const matrix dr, intMatrix xmap, int *counts, int s)
     distSubMat(dr, dx, dD, row, pip); //compute the distance matrix
     findRangeWrap(dD, dranges, s);  //find an appropriate range
     rangeSearchWrap(dD, dranges, dir); //set binary vector for points in range
-    
+    printf("after range search\n");
     sumWrap(dir, dSums);  //This and the next call perform the parallel compaction.
     buildMapWrap(xmap, dir, dSums, row);
     getCountsWrap(dCnts,dir,dSums);  //How many points are assigned to each rep?  It is not 

@@ -7,7 +7,7 @@
 #define BLOCK_SIZE 16 //must be a power of 2
 
 #define MAX_BS 65535 //max block size
-#define SCAN_WIDTH 1024 
+#define SCAN_WIDTH 1024
 
 // Format that the data is manipulated in:
 typedef float real;
