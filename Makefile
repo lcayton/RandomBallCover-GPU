@@ -3,7 +3,7 @@ NVCC=nvcc
 CCFLAGS=
 NVCCFLAGS= --ptxas-options=-v
 #other flags: -deviceemu -arch=sm_20 --compiler-bindir=/usr/bin/gcc-4.3
-LINKFLAGS=-lcuda
+LINKFLAGS=-lcuda 
 #other linkflags: 
 SOURCES=
 CUSOURCES=driver.cu utils.cu utilsGPU.cu rbc.cu kernels.cu brute.cu kernelWrap.cu sKernel.cu

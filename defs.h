@@ -6,7 +6,7 @@
 #define FLOAT_TOL 1e-7
 #define BLOCK_SIZE 16 //must be a power of 2
 
-#define MAX_BS 65535 //max block size
+#define MAX_BS 65535 //max block size (specified by CUDA)
 #define SCAN_WIDTH 1024
 
 // Format that the data is manipulated in:

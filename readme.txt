@@ -37,7 +37,7 @@ closest representative to the query.  (2) Explore the points owned
 by that representative (ie the s-closest points to the representative
 in the DB).  The computePlan code is more complex to make it easy
 to try out other options.  For example, one could search the points
-owned by the two closest representatives to the query instead.  This
+owned by the *two* closest representatives to the query instead.  This
 would require only minor changes to the code.
 
 * Currently the software works only in single precision.  If you wish

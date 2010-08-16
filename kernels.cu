@@ -36,13 +36,14 @@ __global__ void planNNKernel(const matrix Q, const matrix X, real *dMins, int *d
   __syncthreads();
       
   //NOTE: might be better to save numGroup, groupIts in local reg.
-
+ 
   for(i=0;i<numGroups;i++){ //iterate over groups of X  
     if(offX==0 && offQ==0){
       groupCount = cP.groupCountX[IDX(g,i,cP.ld)];
       groupOff = cP.groupOff[IDX(g,i,cP.ld)];
     }
-
+    /* if(qBlock==0 && offQ==0) */
+    /*   printf("g=%d groupCount=%d \n",g,groupCount); */
     __syncthreads();
     
     int groupIts = groupCount/BLOCK_SIZE + (groupCount%BLOCK_SIZE==0? 0 : 1);
@@ -68,7 +69,7 @@ __global__ void planNNKernel(const matrix Q, const matrix X, real *dMins, int *d
 	}
 	__syncthreads();
       }
-      
+     
       //compare to previous min and store into shared mem if needed.
       if(j*BLOCK_SIZE+offX<groupCount && ans<min[offQ][offX]){
 	min[offQ][offX]=ans;

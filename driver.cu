@@ -24,6 +24,7 @@ int main(int argc, char**argv){
   int *NNs, *NNsBrute;
   int i;
   struct timeval tvB,tvE;
+  cudaError_t cE;
 
   printf("*****************\n");
   printf("RANDOM BALL COVER\n");
@@ -37,7 +38,8 @@ int main(int argc, char**argv){
     printf("Unable to select device %d.. exiting. \n",deviceNum);
     exit(1);
   }
-
+  
+  
   unsigned int memFree, memTot;
   CUcontext pctx;
   unsigned int flags=0;
@@ -89,7 +91,7 @@ int main(int argc, char**argv){
   printf("\t.. total time elapsed for rbc = %6.4f \n",timeDiff(tvB,tvE));
   printf("finished \n");
   
-  cudaError_t cE = cudaGetLastError();
+  cE = cudaGetLastError();
   if( cE != cudaSuccess ){
     printf("Execution failed; error type: %s \n", cudaGetErrorString(cE) );
   }
@@ -99,9 +101,11 @@ int main(int argc, char**argv){
   for(i=0;i<q.r;i++)
     ranges[i] = distL1(q,x,i,NNs[i]) - 10e-6;
   
+
   int *cnts = (int*)calloc(q.pr,sizeof(*cnts));
-  
+  gettimeofday(&tvB,NULL);
   bruteRangeCount(x,q,ranges,cnts);
+  gettimeofday(&tvE,NULL);
   
   long int nc=0;
   for(i=0;i<m;i++){
@@ -113,7 +117,8 @@ int main(int argc, char**argv){
     var += (((double)cnts[i])-mean)*(((double)cnts[i])-mean)/((double)m);
   }
   printf("\tavg rank = %6.4f; std dev = %6.4f \n\n", mean, sqrt(var));
-  
+  printf("(range count took %6.4f) \n", timeDiff(tvB, tvE));
+
   if(outFile){
     FILE* fp = fopen(outFile, "a");
     fprintf( fp, "%d %d %6.5f %6.5f \n", numReps, s, mean, sqrt(var) );

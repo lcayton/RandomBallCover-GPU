@@ -77,6 +77,14 @@ void rbc(matrix x, matrix q, int numReps, int s, int *NNs){
   
   build(dx, dr, xmap, groupCountX, s); 
   
+  /* tempXmap.r=xmap.r; tempXmap.pr=xmap.pr; tempXmap.c=xmap.c; tempXmap.pc=xmap.pc; tempXmap.ld=xmap.ld; */
+  /* tempXmap.mat = (int*)calloc( tempXmap.pr*tempXmap.pc, sizeof(*tempXmap.mat) ); */
+  /* cudaMemcpy(tempXmap.mat, xmap.mat, xmap.pr*xmap.pc*sizeof(*xmap.mat), cudaMemcpyDeviceToHost); */
+  /* for( i=0; i<16; i++ ) */
+  /*   printf("%d ",tempXmap.mat[i]); */
+  /* printf("\n"); */
+  /* free(tempXmap.mat); */
+
 
   gettimeofday(&tvB,NULL);  //Start the timer for the queries
   
@@ -87,7 +95,8 @@ void rbc(matrix x, matrix q, int numReps, int s, int *NNs){
 
   //How many points are assigned to each group?
   computeCounts(repIDsQ, m, groupCountQ);
-
+  
+  
   //Set up the mapping from groups to queries (qID).
   buildQMap(q, qID, repIDsQ, numReps, &compLength);
 
@@ -125,14 +134,14 @@ void build(const matrix dx, const matrix dr, intMatrix xmap, int *counts, int s)
   
   int n = dx.pr;
   int p = dr.r;
-  
+
   //Figure out how much fits into memory
   unsigned int memFree, memTot;
   cuMemGetInfo(&memFree, &memTot);
   memFree = (int)(((float)memFree)*MEM_USABLE);
      
-  //memory needed per rep = n*sizeof(real)+n*sizeof(char)+n*sizeof(int)+sizeof(real)+sizeof(int)
-  //                      = dist mat      +ir            +dSums        +range       +dCnts
+  //mem needed per rep = n*sizeof(real)+n*sizeof(char)+n*sizeof(int)+sizeof(real)+sizeof(int)
+  //                   = dist mat      +ir            +dSums        +range       +dCnts
   int ptsAtOnce = DPAD(memFree/((n+1)*sizeof(real) + n*sizeof(char) +(n+1)*sizeof(int)));
   if(ptsAtOnce==0){
     fprintf(stderr,"memfree = %d \n",memFree);
@@ -156,7 +165,7 @@ void build(const matrix dx, const matrix dr, intMatrix xmap, int *counts, int s)
   intMatrix dSums; //used to compute memory addresses.
   dSums.r=dir.r; dSums.pr=dir.pr; dSums.c=dir.c; dSums.pc=dir.pc; dSums.ld=dir.ld;
   cudaMalloc( (void**)&dSums.mat, dSums.pc*dSums.pr*sizeof(*dSums.mat) );
-  
+
   int *dCnts;
   cudaMalloc( (void**)&dCnts, ptsAtOnce*sizeof(*dCnts) );
     
@@ -175,17 +184,18 @@ void build(const matrix dx, const matrix dr, intMatrix xmap, int *counts, int s)
     distSubMat(dr, dx, dD, row, pip); //compute the distance matrix
     findRangeWrap(dD, dranges, s);  //find an appropriate range
     rangeSearchWrap(dD, dranges, dir); //set binary vector for points in range
-    printf("after range search\n");
+    
     sumWrap(dir, dSums);  //This and the next call perform the parallel compaction.
+
     buildMapWrap(xmap, dir, dSums, row);
     getCountsWrap(dCnts,dir,dSums);  //How many points are assigned to each rep?  It is not 
                                      //*exactly* s, which is why we need to compute this.
     cudaMemcpy( &counts[row], dCnts, pi*sizeof(*counts), cudaMemcpyDeviceToHost );
-
+    
     numLeft -= pi;
     row += pi;
   }
-  
+ 
   cudaFree(dCnts);
   free(ir.mat);
   cudaFree(dranges);
@@ -459,6 +469,7 @@ void computeNNs(matrix dx, matrix dq, intMatrix xmap, compPlan cP, int *qIDs, in
   int numDone = 0;
   while( numDone<compLength ){
     int todo = MIN( (compLength-numDone) , MAX_BS*BLOCK_SIZE );
+
     dimGrid.y = todo/BLOCK_SIZE;
     planNNKernel<<<dimGrid,dimBlock>>>(dq,dx,dMins,dMinIDs,dcP,xmap,dqIDs,numDone);
     cudaThreadSynchronize();
@@ -466,7 +477,6 @@ void computeNNs(matrix dx, matrix dq, intMatrix xmap, compPlan cP, int *qIDs, in
   }
 
   cudaMemcpy( NNs, dMinIDs, dq.r*sizeof(*NNs), cudaMemcpyDeviceToHost);
-  
   
   cudaFree(dcP.numGroups);
   cudaFree(dcP.groupCountX);

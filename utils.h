@@ -10,6 +10,7 @@ int randBetween(int,int);
 void printMat(matrix);
 void printMatWithIDs(matrix,int*);
 void printCharMat(charMatrix);
+void printIntMat(intMatrix);
 void printVector(real*,int);
 void copyVector(real*,real*,int);
 real distL1(matrix,matrix,int,int);

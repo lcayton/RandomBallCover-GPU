@@ -102,6 +102,15 @@ void printCharMat(charMatrix A){
   }
 }
 
+void printIntMat(intMatrix A){
+  int i,j;
+  for(i=0;i<A.r;i++){
+    for(j=0;j<A.c;j++)
+      printf("%d ",(int)A.mat[IDX(i,j,A.ld)]);
+    printf("\n");
+  }
+}
+
 void printVector(real *x, int d){
   int i;
 

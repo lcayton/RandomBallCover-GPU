@@ -25,7 +25,7 @@ void dist1Wrap(matrix dq, matrix dx, matrix dD){
     }
     numDoneX += todoX;
   }
-  
+
   cudaThreadSynchronize();
 }
 

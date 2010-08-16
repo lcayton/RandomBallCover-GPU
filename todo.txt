@@ -1,3 +1,4 @@
+- make use of void* to clean up code
 - fix problems related to limitations on number of kernel launches
 - Make sure that the code works with r,s that are not powers of 2
 
