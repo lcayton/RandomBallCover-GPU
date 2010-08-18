@@ -1,3 +1,10 @@
+/* This file contains functions that were in use at one point but 
+   are not currently used.  As far as I know, everything here is
+   debugged, and so can be plugged in reasonably safely.
+*/
+
+
+
 /* This is the more complex version of computeReps.  It can be used even if X doesn't
 fit into the device memory.  It does not work in emulation mode, because it checks to see
 how much mem is available on the device.  Thus for debugging purposes we currently 
@@ -314,3 +321,146 @@ void brute2Step(matrix x, matrix q, intMatrix NNs){
   cudaFree(dMins.mat);
 
 }
+
+
+memPlan createMemPlan(int,int);
+
+memPlan createMemPlan(unint nPts, unint memPerPt){
+  memPlan mp;
+  unsigned int memFree, memTot;
+  unint ptsAtOnce;
+
+  cuMemGetInfo(&memFree, &memTot);
+  memFree = (unint)(((float)memFree)*MEM_USABLE);
+  printf("memfree = %d \n",memFree);
+  ptsAtOnce = DPAD(memFree/memPerPt); //max number of pts that can be processed at once
+  printf("ptsAtOnce = %d \n",ptsAtOnce);
+  mp.numComputeSegs = nPts/ptsAtOnce + ((nPts%ptsAtOnce==0) ? 0 : 1);
+  mp.normSegSize=PAD(nPts/mp.numComputeSegs); 
+  mp.lastSegSize=PAD(nPts) - mp.normSegSize*(mp.numComputeSegs-1);
+  //Note that lastSegSize is automatically padded if nPts is.
+  return mp;
+}
+
+typedef struct {
+  unint numComputeSegs;
+  unint normSegSize;//The number of points handled in one computation,
+                     //though there will always be one leftover segment
+                     //with (possibly) a different number of points.
+  unint lastSegSize;//.. and this is it.
+} memPlan;
+
+
+void blockIntersection(charMatrix,matrix,real*,real*);
+
+void blockIntersection(charMatrix cM, matrix dr, real *radiiX, real *radiiQ){
+  matrix dD;
+  real *dradiiX, *dradiiQ;
+  unint pnR = dr.pr;
+  charMatrix dcM;
+  
+  dD.r=dD.c=dr.r; dD.pr=dD.pc=dD.ld=dr.pr;
+  dcM.r=cM.r; dcM.c=cM.c; dcM.pr=cM.pr; dcM.pc=cM.pc; dcM.ld=cM.ld;
+  
+  checkErr( cudaMalloc((void**)&dD.mat, pnR*pnR*sizeof(*dD.mat)) );
+  checkErr( cudaMalloc((void**)&dradiiX, pnR*sizeof(*dradiiX)) );
+  checkErr( cudaMalloc((void**)&dradiiQ, pnR*sizeof(*dradiiQ)) );
+  checkErr( cudaMalloc((void**)&dcM.mat, dcM.pr*dcM.pc*sizeof(*dcM.mat)) );
+  
+  // Copying over the radii. Note that everything after the first dr.r places 
+  // on the device variables is undefined.
+  cudaMemcpy(dradiiX,radiiX,dr.r*sizeof(*dradiiX),cudaMemcpyHostToDevice);
+  cudaMemcpy(dradiiQ,radiiQ,dr.r*sizeof(*dradiiQ),cudaMemcpyHostToDevice);
+  
+  dist1Wrap(dr, dr, dD);
+  pruneWrap(dcM, dD, dradiiX, dradiiQ);
+
+  cudaMemcpy(cM.mat,dcM.mat,pnR*pnR*sizeof(*dcM.mat),cudaMemcpyDeviceToHost);
+  
+  cudaFree(dcM.mat);
+  cudaFree(dradiiQ);
+  cudaFree(dradiiX);
+  cudaFree(dD.mat);
+}
+
+
+
+void groupPoints(matrix,unint*,unint*,unint);
+
+// This function sorts points by their repID.  It makes two passes through the 
+// matrix x; one to count the bucket sizes, the next to place points in the 
+// correct bucket.  Note that this function allocates a temporary
+// matrix the size of x, then copies the results over to x at the end.  The 
+// sort could be done in place, eg by doing numReps passes through x instead of 2.
+void groupPoints(matrix x, unint *xID, unint *repIDs, unint numReps){
+  matrix y;
+  unint n=x.r;
+  unint d=x.c;
+  unint i;
+  unint *gS; //groupSize
+  unint *yID;
+
+  yID = (unint*)calloc(n,sizeof(*yID));
+  y.mat = (real*)calloc(n*d,sizeof(*y.mat));
+  gS = (unint*)calloc(numReps+1,sizeof(*gS));
+
+  y.r=n; y.pr=n; y.c=d; y.pc=d; y.ld=d;
+
+  for(i=0;i<n;i++)
+    gS[repIDs[i]+1]++;
+  for(i=1;i<numReps;i++)
+    gS[i]=gS[i-1]+gS[i];
+  
+  for(i=0;i<n;i++){
+    copyVector(&y.mat[IDX(gS[repIDs[i]],0,y.ld)], &x.mat[IDX(i,0,x.ld)],d);
+    yID[gS[repIDs[i]]]=xID[i];
+    gS[repIDs[i]]++;
+  }
+  
+  for(i=0;i<n;i++){
+    copyVector(&x.mat[IDX(i,0,x.ld)],&y.mat[IDX(i,0,y.ld)],d);
+    xID[i]=yID[i];
+  }
+  
+  free(yID);
+  free(gS);
+  free(y.mat);
+}
+
+__global__ void pruneKernel(const matrix,const real*,const real*,charMatrix);
+
+
+__global__ void pruneKernel(const matrix D, const real *radiiX, const real *radiiQ, charMatrix cM){
+  unint offX = threadIdx.x;
+  unint offQ = threadIdx.y;
+
+  unint blockX = blockIdx.x * BLOCK_SIZE;
+  unint blockQ = blockIdx.y * BLOCK_SIZE;
+  
+  __shared__ real sD[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ real sRQ[BLOCK_SIZE];
+  __shared__ real sRX[BLOCK_SIZE];
+
+  sD[offQ][offX]=D.mat[IDX(blockQ+offQ,blockX+offX,D.ld)];
+  
+  if(offQ==0)
+    sRX[offX]=radiiX[blockX+offX];
+  if(offX==0)
+    sRQ[offQ]=radiiQ[blockQ+offQ];
+  
+  __syncthreads();
+  
+  if(blockQ+offQ < D.r && blockX+offX < D.c){
+    cM.mat[IDX(blockQ+offQ,blockX+offX,cM.ld)] = (sD[offQ][offX]-sRX[offX]-2*sRQ[offQ] <= 0) ? 1 : 0;
+  }
+}
+
+void pruneWrap(charMatrix dcM, matrix dD, real *dradiiX, real *dradiiQ){
+  dim3 block(BLOCK_SIZE,BLOCK_SIZE);
+  dim3 grid(dD.pr/BLOCK_SIZE,dD.pc/BLOCK_SIZE);
+  
+  pruneKernel<<<grid,block>>>(dD,dradiiX,dradiiQ,dcM);
+  cudaThreadSynchronize();
+}
+
+void pruneWrap(charMatrix,matrix,real*,real*);

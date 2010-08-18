@@ -1,3 +1,7 @@
+/* This file is part of the Random Ball Cover (RBC) library.
+ * (C) Copyright 2010, Lawrence Cayton [lcayton@tuebingen.mpg.de]
+ */
+
 #ifndef UTILS_CU
 #define UTILS_CU
 
@@ -5,13 +9,14 @@
 #include<stdio.h>
 #include "utils.h"
 #include "defs.h"
+#include "kernels.h"
 
 //Returns a length l subset of a random permutation of [0,...,n-1]
 //using the knuth shuffle.
 //Input variable x is assumed to be alloced and of size l.
-void subRandPerm(int l, int n, int *x){
-  int i,ri, *y;
-  y = (int*)calloc(n,sizeof(*y));
+void subRandPerm(unint l, unint n, unint *x){
+  unint i,ri, *y;
+  y = (unint*)calloc(n,sizeof(*y));
     
   struct timeval t3;
   gettimeofday(&t3,NULL);
@@ -33,8 +38,8 @@ void subRandPerm(int l, int n, int *x){
 
 //Generates a random permutation of 0, ... , n-1 using the knuth shuffle.
 //This should probably be merged with subRandPerm. 
-void randPerm(int n, int *x){
-  int i,ri;
+void randPerm(unint n, unint *x){
+  unint i,ri;
   
   struct timeval t3;
   gettimeofday(&t3,NULL);
@@ -50,14 +55,14 @@ void randPerm(int n, int *x){
   }
 }
 
-void swap(int *a, int *b){
-  int t;
+void swap(unint *a, unint *b){
+  unint t;
   t=*a; *a=*b; *b=t;
 }
 
 //generates a rand int in rand [a,b) 
-int randBetween(int a, int b){
-  int val,c;
+unint randBetween(unint a, unint b){
+  unint val,c;
 
   if(b<=a){
     fprintf(stderr,"misuse of randBetween.. exiting\n");
@@ -73,7 +78,7 @@ int randBetween(int a, int b){
 
 
 void printMat(matrix A){
-  int i,j;
+  unint i,j;
   for(i=0;i<A.r;i++){
     for(j=0;j<A.c;j++)
       printf("%6.4f ",(float)A.mat[IDX(i,j,A.ld)]);
@@ -82,8 +87,8 @@ void printMat(matrix A){
 }
 
 
-void printMatWithIDs(matrix A, int *id){
-  int i,j;
+void printMatWithIDs(matrix A, unint *id){
+  unint i,j;
   for(i=0;i<A.r;i++){
     for(j=0;j<A.c;j++)
       printf("%6.4f ",(float)A.mat[IDX(i,j,A.ld)]);
@@ -94,7 +99,7 @@ void printMatWithIDs(matrix A, int *id){
 
 
 void printCharMat(charMatrix A){
-  int i,j;
+  unint i,j;
   for(i=0;i<A.r;i++){
     for(j=0;j<A.c;j++)
       printf("%d ",(char)A.mat[IDX(i,j,A.ld)]);
@@ -103,16 +108,16 @@ void printCharMat(charMatrix A){
 }
 
 void printIntMat(intMatrix A){
-  int i,j;
+  unint i,j;
   for(i=0;i<A.r;i++){
     for(j=0;j<A.c;j++)
-      printf("%d ",(int)A.mat[IDX(i,j,A.ld)]);
+      printf("%d ",(unint)A.mat[IDX(i,j,A.ld)]);
     printf("\n");
   }
 }
 
-void printVector(real *x, int d){
-  int i;
+void printVector(real *x, unint d){
+  unint i;
 
   for(i=0 ; i<d; i++)
     printf("%6.2f ",x[i]);
@@ -120,8 +125,8 @@ void printVector(real *x, int d){
 }
 
 
-void copyVector(real *x, real *y, int d){
-  int i;
+void copyVector(real *x, real *y, unint d){
+  unint i;
   
   for(i=0;i<d;i++)
     x[i]=y[i];
@@ -129,7 +134,7 @@ void copyVector(real *x, real *y, int d){
 
 
 void copyMat(matrix *x, matrix *y){
-  int i,j;
+  unint i,j;
   
   x->r=y->r; x->pr=y->pr; x->c=y->c; x->pc=y->pc; x->ld=y->ld;
   for(i=0; i<y->r; i++){
@@ -140,12 +145,13 @@ void copyMat(matrix *x, matrix *y){
 }
 
 
-real distL1(matrix x, matrix y, int k, int l){
-  int i;
+real distVec(matrix x, matrix y, unint k, unint l){
+  unint i;
   real ans=0;
   
   for(i=0;i<x.c;i++)
-    ans+=abs(x.mat[IDX(k,i,x.ld)]-y.mat[IDX(l,i,x.ld)]);
+    ans += DIST( x.mat[IDX(k,i,x.ld)], y.mat[IDX(l,i,x.ld)] );
+    //ans+=fabs(x.mat[IDX(k,i,x.ld)]-y.mat[IDX(l,i,x.ld)]);
   return ans;
 }
 

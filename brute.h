@@ -1,10 +1,14 @@
+/* This file is part of the Random Ball Cover (RBC) library.
+ * (C) Copyright 2010, Lawrence Cayton [lcayton@tuebingen.mpg.de]
+ */
+
 #ifndef BRUTE_H
 #define BRUTE_H
 
 #include "defs.h"
 
-void bruteRangeCount(matrix,matrix,real*,int*);
-void bruteSearch(matrix,matrix,int*);
-void bruteCPU(matrix,matrix,int*);
+void bruteRangeCount(matrix,matrix,real*,unint*);
+void bruteSearch(matrix,matrix,unint*);
+void bruteCPU(matrix,matrix,unint*);
 
 #endif

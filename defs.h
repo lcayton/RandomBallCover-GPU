@@ -4,10 +4,18 @@
 #include<float.h>
 
 #define FLOAT_TOL 1e-7
-#define BLOCK_SIZE 16 //must be a power of 2
+#define BLOCK_SIZE 16 //must be a power of 2 (current 
+// implementation of findRange requires a power of 4, in fact)
 
 #define MAX_BS 65535 //max block size (specified by CUDA)
 #define SCAN_WIDTH 1024
+
+#define MEM_USED_IN_SCAN(n) ( 2*( (n) + SCAN_WIDTH-1 )/SCAN_WIDTH*sizeof(unint))
+
+//The distance measure that is used.  This macro returns the 
+//distance for a single coordinate.
+#define DIST(i,j) ( fabs((i)-(j)) )  // L_1
+//#define DIST(i,j) ( ( (i)-(j) )*( (i)-(j) ) )  // L_2
 
 // Format that the data is manipulated in:
 typedef float real;
@@ -22,7 +30,7 @@ typedef float real;
 //Percentage of device mem to use
 #define MEM_USABLE .95
 
-#define DUMMY_IDX INT_MAX
+#define DUMMY_IDX UINT_MAX
 
 //Row major indexing
 #define IDX(i,j,ld) (((i)*(ld))+(j))
@@ -37,53 +45,53 @@ typedef float real;
 
 #define MIN(i,j) ((i) < (j) ? (i) : (j))
 
+typedef unsigned int unint;
+
+
 typedef struct {
   real *mat;
-  int r; //rows
-  int c; //cols
-  int pr; //padded rows
-  int pc; //padded cols
-  int ld; //the leading dimension (in this code, this is the same as pc)
+  unint r; //rows
+  unint c; //cols
+  unint pr; //padded rows
+  unint pc; //padded cols
+  unint ld; //the leading dimension (in this code, this is the same as pc)
 } matrix;
 
 
 typedef struct {
   char *mat;
-  int r;
-  int c;
-  int pr;
-  int pc;
-  int ld;
+  unint r;
+  unint c;
+  unint pr;
+  unint pc;
+  unint ld;
 } charMatrix;
 
+
 typedef struct {
-  int *mat;
-  int r;
-  int c;
-  int pr;
-  int pc;
-  int ld;
+  unint *mat;
+  unint r;
+  unint c;
+  unint pr;
+  unint pc;
+  unint ld;
 } intMatrix;
 
 
-typedef struct {
-  int numComputeSegs;
-  int normSegSize;//The number of points handled in one computation,
-                     //though there will always be one leftover segment
-                     //with (possibly) a different number of points.
-  int lastSegSize;//.. and this is it.
-} memPlan;
-
-
 typedef struct{
-  int *numGroups; //The number of groups of DB points to be examined.
-  int sNumGroups; //size of the above array.
-  int *groupCountX; //The number of elements in each group.
-  int sGroupCountX;
-  int *groupOff;
-  int sGroupOff;
-  int *qToGroup; //map from query to group #.
-  int sQToGroup;
-  int ld; //the width of memPos and groupCount (= max over numGroups)
+  unint *numGroups; //The number of groups of DB points to be examined.
+  unint *groupCountX; //The number of elements in each DB group.
+  unint *qToQGroup; //map from query to query group #.
+  unint *qGroupToXGroup; //map from query group to DB gruop
+  unint ld; //the width of memPos and groupCount (= max over numGroups)
 } compPlan;
+
+
+typedef struct {
+  matrix dx;
+  intMatrix dxMap;
+  matrix dr;
+  unint *groupCount;
+} rbcStruct;
+
 #endif

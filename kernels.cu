@@ -1,3 +1,7 @@
+/* This file is part of the Random Ball Cover (RBC) library.
+ * (C) Copyright 2010, Lawrence Cayton [lcayton@tuebingen.mpg.de]
+ */
+
 #ifndef KERNELS_CU
 #define KERNELS_CU
 
@@ -7,198 +11,153 @@
 #include<stdio.h>
 
 // This kernel does the same thing as nnKernel, except it only considers pairs as 
-// specified by the compPlan.
-__global__ void planNNKernel(const matrix Q, const matrix X, real *dMins, int *dMinIDs, compPlan cP, intMatrix xmap, int *qIDs, int qStartPos ){
-  int qBlock = qStartPos + blockIdx.y * BLOCK_SIZE;  //indexes Q
-  int xBlock; //indexes X;
-  int colBlock;
-  int offQ = threadIdx.y; //the offset of qPos in this block
-  int offX = threadIdx.x; //ditto for x
-  int i,j,k,l;
-  
+// specified by the compPlan. 
+__global__ void planNNKernel(const matrix Q, const unint *qMap, const matrix X, const intMatrix xMap, real *dMins, unint *dMinIDs, compPlan cP,  unint qStartPos ){
+  unint qB = qStartPos + blockIdx.y * BLOCK_SIZE;  //indexes Q
+  unint xB; //X (DB) Block;
+  unint cB; //column Block
+  unint offQ = threadIdx.y; //the offset of qPos in this block
+  unint offX = threadIdx.x; //ditto for x
+  unint i,j,k;
+  unint groupIts;
   
   __shared__ real min[BLOCK_SIZE][BLOCK_SIZE];
-  __shared__ int minPos[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ unint minPos[BLOCK_SIZE][BLOCK_SIZE];
 
-  __shared__ real Xb[BLOCK_SIZE][BLOCK_SIZE];
-  __shared__ real Qb[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ real Xs[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ real Qs[BLOCK_SIZE][BLOCK_SIZE];
 
-  __shared__ int g; //group of q  
-  __shared__ int numGroups;
-  __shared__ int groupCount;
-  __shared__ int groupOff;
+  unint g; //query group of q
+  unint xG; //DB group currently being examined
+  unint numGroups;
+  unint groupCount;
 
-  if(offX==0 && offQ==0){
-    g = cP.qToGroup[qBlock]; 
-    numGroups = cP.numGroups[g];
-  }
+  g = cP.qToQGroup[qB]; 
+  numGroups = cP.numGroups[g];
+  
   min[offQ][offX]=MAX_REAL;
   __syncthreads();
-      
-  //NOTE: might be better to save numGroup, groupIts in local reg.
- 
-  for(i=0;i<numGroups;i++){ //iterate over groups of X  
-    if(offX==0 && offQ==0){
-      groupCount = cP.groupCountX[IDX(g,i,cP.ld)];
-      groupOff = cP.groupOff[IDX(g,i,cP.ld)];
-    }
-    /* if(qBlock==0 && offQ==0) */
-    /*   printf("g=%d groupCount=%d \n",g,groupCount); */
-    __syncthreads();
-    
-    int groupIts = groupCount/BLOCK_SIZE + (groupCount%BLOCK_SIZE==0? 0 : 1);
-   
-    xBlock=groupOff;
-    for(j=0;j<groupIts;j++){ //iterate over elements of group
-      xBlock=j*BLOCK_SIZE;
-      
+  
+
+  for(i=0; i<numGroups; i++){ //iterate over DB groups
+    xG = cP.qGroupToXGroup[IDX( g, i, cP.ld )];
+    groupCount = cP.groupCountX[IDX( g, i, cP.ld )];
+    groupIts = (groupCount+BLOCK_SIZE-1)/BLOCK_SIZE;
+
+    for(j=0; j<groupIts; j++){ //iterate over elements of group
+      xB=j*BLOCK_SIZE;
+
       real ans=0;
-      for(k=0;k<X.pc/BLOCK_SIZE;k++){ // iterate over cols to compute the distances
-	colBlock = k*BLOCK_SIZE;
+      for(cB=0; cB<X.pc; cB+=BLOCK_SIZE){ // iterate over cols to compute distances
 
-	//Each thread loads one element of X and Q into memory.
-	//Note that the indexing is flipped to increase memory
-	//coalescing.
-
-	Xb[offX][offQ] = X.mat[IDX( xmap.mat[IDX( g, xBlock+offQ, xmap.ld)], colBlock+offX, X.ld)];
-	Qb[offX][offQ] = ( (qIDs[qBlock+offQ]==DUMMY_IDX) ? 0 : Q.mat[IDX(qIDs[qBlock+offQ],colBlock+offX,Q.ld)] );
+	Xs[offX][offQ] = X.mat[IDX( xMap.mat[IDX( xG, xB+offQ, xMap.ld )], cB+offX, X.ld )];
+	Qs[offX][offQ] = ( (qMap[qB+offQ]==DUMMY_IDX) ? 0 : Q.mat[IDX( qMap[qB+offQ], cB+offX, Q.ld )] );
 	__syncthreads();
 	
-	for(l=0;l<BLOCK_SIZE;l++){
-	  ans+=abs(Xb[l][offX]-Qb[l][offQ]);
-	}
+	for(k=0; k<BLOCK_SIZE; k++)
+	  ans+=DIST( Xs[k][offX], Qs[k][offQ] );
+
 	__syncthreads();
       }
      
       //compare to previous min and store into shared mem if needed.
-      if(j*BLOCK_SIZE+offX<groupCount && ans<min[offQ][offX]){
+      if(xB+offX<groupCount && ans<min[offQ][offX]){
 	min[offQ][offX]=ans;
-	minPos[offQ][offX]= xmap.mat[IDX( g, xBlock+offX, xmap.ld )];
+	minPos[offQ][offX]= xMap.mat[IDX( xG, xB+offX, xMap.ld )];
       }
       __syncthreads();
-      
     }
   }
   
-  //compare across threads
-  for(k=BLOCK_SIZE/2;k>0;k/=2){
-    if(offX<k){
-      if(min[offQ][offX+k]<min[offQ][offX]){
-	min[offQ][offX] = min[offQ][offX+k];
-	minPos[offQ][offX] = minPos[offQ][offX+k];	
+  //Reduce across threads
+  for(i=BLOCK_SIZE/2; i>0; i/=2){
+    if( offX<i ){
+      if( min[offQ][offX+i] < min[offQ][offX] ){
+	min[offQ][offX] = min[offQ][offX+i];
+	minPos[offQ][offX] = minPos[offQ][offX+i];	
       }
     }
     __syncthreads();
   }
-  
-  if(offX==0 && qIDs[qBlock+offQ]!=DUMMY_IDX){
-    dMins[qIDs[qBlock+offQ]] = min[offQ][0];
-    dMinIDs[qIDs[qBlock+offQ]] = minPos[offQ][0];
+
+  if(offX==0 && qMap[qB+offQ]!=DUMMY_IDX){
+    dMins[qMap[qB+offQ]] = min[offQ][0];
+    dMinIDs[qMap[qB+offQ]] = minPos[offQ][0];
   }
 }
 
 
 
-__global__ void pruneKernel(const matrix D, const real *radiiX, const real *radiiQ, charMatrix cM){
-  int offX = threadIdx.x;
-  int offQ = threadIdx.y;
+__global__ void nnKernel(const matrix Q, unint numDone, const matrix X, real *dMins, unint *dMinIDs){
 
-  int blockX = blockIdx.x * BLOCK_SIZE;
-  int blockQ = blockIdx.y * BLOCK_SIZE;
-  
-  __shared__ real sD[BLOCK_SIZE][BLOCK_SIZE];
-  __shared__ real sRQ[BLOCK_SIZE];
-  __shared__ real sRX[BLOCK_SIZE];
-
-  sD[offQ][offX]=D.mat[IDX(blockQ+offQ,blockX+offX,D.ld)];
-  
-  if(offQ==0)
-    sRX[offX]=radiiX[blockX+offX];
-  if(offX==0)
-    sRQ[offQ]=radiiQ[blockQ+offQ];
-  
-  __syncthreads();
-  
-  if(blockQ+offQ < D.r && blockX+offX < D.c){
-    cM.mat[IDX(blockQ+offQ,blockX+offX,cM.ld)] = (sD[offQ][offX]-sRX[offX]-2*sRQ[offQ] <= 0) ? 1 : 0;
-    //cM.mat[IDX(blockQ+offQ,blockX+offX,cM.ld)] = (sD[offQ][offX]-4*sRQ[offQ] <= 0) ? 1 : 0;
-  }
-}
-
-
-__global__ void nnKernel(const matrix Q, const matrix X, real *dMins, int *dMinIDs){
-
-  int qBlock = blockIdx.y * BLOCK_SIZE;  //indexes Q
-  int xBlock; //indexes X;
-  int colBlock;
-  int offQ = threadIdx.y; //the offset of qPos in this block
-  int offX = threadIdx.x; //ditto for x
-  int i,j,k;
+  unint qB = blockIdx.y * BLOCK_SIZE + numDone;  //indexes Q
+  unint xB; //indexes X;
+  unint cB; //colBlock
+  unint offQ = threadIdx.y; //the offset of qPos in this block
+  unint offX = threadIdx.x; //ditto for x
+  unint i;
+  real ans;
 
   __shared__ real min[BLOCK_SIZE][BLOCK_SIZE];
-  __shared__ int minPos[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ unint minPos[BLOCK_SIZE][BLOCK_SIZE];
 
-  __shared__ real Xb[BLOCK_SIZE][BLOCK_SIZE];
-  __shared__ real Qb[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ real Xs[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ real Qs[BLOCK_SIZE][BLOCK_SIZE];
 
   min[offQ][offX]=MAX_REAL;
   __syncthreads();
 
-  for(i=0;i<X.pr/BLOCK_SIZE;i++){
-    xBlock = i*BLOCK_SIZE;
-    real ans=0;
-    for(j=0;j<X.pc/BLOCK_SIZE;j++){
-      colBlock = j*BLOCK_SIZE;
+  for(xB=0; xB<X.pr; xB+=BLOCK_SIZE){
+    ans=0;
+    for(cB=0; cB<X.pc; cB+=BLOCK_SIZE){
       
       //Each thread loads one element of X and Q into memory.
-      //Note that the indexing is flipped to increase memory
-      //coalescing.
-      Xb[offX][offQ]=X.mat[IDX(xBlock+offQ,colBlock+offX,X.ld)];
-      Qb[offX][offQ]=Q.mat[IDX(qBlock+offQ,colBlock+offX,Q.ld)];
-
+      Xs[offX][offQ] = X.mat[IDX( xB+offQ, cB+offX, X.ld )];
+      Qs[offX][offQ] = Q.mat[IDX( qB+offQ, cB+offX, Q.ld )];
+      
       __syncthreads();
-
-      for(k=0;k<BLOCK_SIZE;k++){
-	ans+=abs(Xb[k][offX]-Qb[k][offQ]);
-      }
+      
+      for(i=0;i<BLOCK_SIZE;i++)
+	ans += DIST( Xs[i][offX], Qs[i][offQ] );
+      
       __syncthreads();
     }
    
-    
-    if( xBlock+offX<X.r && ans<min[offQ][offX] ){
-       minPos[offQ][offX] = xBlock+offX;
-       min[offQ][offX] = ans;
+    if( xB+offX<X.r && ans<min[offQ][offX] ){
+      minPos[offQ][offX] = xB+offX;
+      min[offQ][offX] = ans;
     }
   }
   __syncthreads();
   
   
   //reduce across threads
-  for(j=BLOCK_SIZE/2;j>0;j/=2){
-    if(offX<j){
-      if(min[offQ][offX+j]<min[offQ][offX]){
-	min[offQ][offX] = min[offQ][offX+j];
-	minPos[offQ][offX] = minPos[offQ][offX+j];	
+  for(i=BLOCK_SIZE/2; i>0; i/=2){
+    if(offX<i){
+      if(min[offQ][offX+i]<min[offQ][offX]){
+	min[offQ][offX] = min[offQ][offX+i];
+	minPos[offQ][offX] = minPos[offQ][offX+i];	
       }
     }
     __syncthreads();
   }
   
   if(offX==0){
-    //printf("writing %d, nn= %d, val = %6.4f \n",qBlock+offQ,curMinPos[offQ],curMin[offQ]);
-    dMins[qBlock+offQ] = min[offQ][0];
-    dMinIDs[qBlock+offQ] = minPos[offQ][0];
+    dMins[qB+offQ] = min[offQ][0];
+    dMinIDs[qB+offQ] = minPos[offQ][0];
   }
 }
 
 
-__device__ void dist1Kernel(const matrix Q, int qStart, const matrix X, int xStart, matrix D){
-  int c, i, j;
 
-  int qB = blockIdx.y*BLOCK_SIZE + qStart;
-  int q  = threadIdx.y;
-  int xB = blockIdx.x*BLOCK_SIZE + xStart;
-  int x = threadIdx.x;
+
+__global__ void dist1Kernel(const matrix Q, unint qStart, const matrix X, unint xStart, matrix D){
+  unint c, i, j;
+
+  unint qB = blockIdx.y*BLOCK_SIZE + qStart;
+  unint q  = threadIdx.y;
+  unint xB = blockIdx.x*BLOCK_SIZE + xStart;
+  unint x = threadIdx.x;
 
   real ans=0;
 
@@ -217,8 +176,8 @@ __device__ void dist1Kernel(const matrix Q, int qStart, const matrix X, int xSta
     __syncthreads();
 
     for(j=0 ; j<BLOCK_SIZE ; j++)
-      ans += abs( Qs[j][q] - Xs[j][x] );
-        
+      ans += DIST( Qs[j][q], Xs[j][x] );
+    
     __syncthreads();
   }
   
@@ -228,16 +187,16 @@ __device__ void dist1Kernel(const matrix Q, int qStart, const matrix X, int xSta
 
 
 
-__global__ void findRangeKernel(matrix D, real *ranges, int cntWant){
+__global__ void findRangeKernel(const matrix D, unint numDone, real *ranges, unint cntWant){
   
-  int row = blockIdx.y*(BLOCK_SIZE/4)+threadIdx.y;
-  int ro = threadIdx.y;
-  int co = threadIdx.x;
-  int i, c;
+  unint row = blockIdx.y*(BLOCK_SIZE/4)+threadIdx.y + numDone;
+  unint ro = threadIdx.y;
+  unint co = threadIdx.x;
+  unint i, c;
   real t;
 
-  const int LB = (90*cntWant)/100 ;
-  const int UB = cntWant; 
+  const unint LB = (90*cntWant)/100 ;
+  const unint UB = cntWant; 
 
   __shared__ real smin[BLOCK_SIZE/4][4*BLOCK_SIZE];
   __shared__ real smax[BLOCK_SIZE/4][4*BLOCK_SIZE];
@@ -266,10 +225,10 @@ __global__ void findRangeKernel(matrix D, real *ranges, int cntWant){
 
   //Now start range counting.
 
-  int itcount=0;
-  int cnt;
+  unint itcount=0;
+  unint cnt;
   real rg;
-  __shared__ int scnt[BLOCK_SIZE/4][4*BLOCK_SIZE];
+  __shared__ unint scnt[BLOCK_SIZE/4][4*BLOCK_SIZE];
   __shared__ char cont[BLOCK_SIZE/4];
   
   if(co==0)
@@ -324,30 +283,30 @@ __global__ void findRangeKernel(matrix D, real *ranges, int cntWant){
 }
 
 
-__global__ void rangeSearchKernel(matrix D, int xOff, int yOff, real *ranges, charMatrix ir){
-  int col = blockIdx.x*BLOCK_SIZE + threadIdx.x + xOff;
-  int row = blockIdx.y*BLOCK_SIZE + threadIdx.y + yOff;
+__global__ void rangeSearchKernel(const matrix D, unint xOff, unint yOff, const real *ranges, charMatrix ir){
+  unint col = blockIdx.x*BLOCK_SIZE + threadIdx.x + xOff;
+  unint row = blockIdx.y*BLOCK_SIZE + threadIdx.y + yOff;
 
   ir.mat[IDX( row, col, ir.ld )] = D.mat[IDX( row, col, D.ld )] < ranges[row];
 
 }
 
 
-__global__ void rangeCountKernel(const matrix Q, const matrix X, real *ranges, int *counts){
-  int q = blockIdx.y*BLOCK_SIZE;
-  int qo = threadIdx.y;
-  int xo = threadIdx.x;
+__global__ void rangeCountKernel(const matrix Q, unint numDone, const matrix X, real *ranges, unint *counts){
+  unint q = blockIdx.y*BLOCK_SIZE + numDone;
+  unint qo = threadIdx.y;
+  unint xo = threadIdx.x;
   
   real rg = ranges[q+qo];
   
-  int r,c,i;
+  unint r,c,i;
 
-  __shared__ int scnt[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ unint scnt[BLOCK_SIZE][BLOCK_SIZE];
 
   __shared__ real xs[BLOCK_SIZE][BLOCK_SIZE];
   __shared__ real qs[BLOCK_SIZE][BLOCK_SIZE];
   
-  int cnt=0;
+  unint cnt=0;
   for( r=0; r<X.pr; r+=BLOCK_SIZE ){
 
     real dist=0;
@@ -357,7 +316,8 @@ __global__ void rangeCountKernel(const matrix Q, const matrix X, real *ranges, i
       __syncthreads();
       
       for( i=0; i<BLOCK_SIZE; i++)
-	dist += abs(xs[i][xo]-qs[i][qo]);
+	dist += DIST( xs[i][xo], qs[i][qo] );
+
       __syncthreads();
 
     }

@@ -2,7 +2,7 @@
 Lawrence Cayton
 lcayton@tuebingen.mpg.de
 
-(C) Copyright 2010, Lawrence Cayton
+(C) Copyright 2010, Lawrence Cayton [lcayton@tuebingen.mpg.de]
  
 This program is free software: you can redistribute it and/or modify 
 it under the terms of the GNU General Public License as published by
@@ -18,31 +18,98 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ---------------------------------------------------------------------
+SUMMARY
 
 This is a C and CUDA implementation of the Random Ball Cover data 
-structure for nearest neighbor search.  
+structure for nearest neighbor search described in 
 
-Notes on the code:
+L. Cayton, A nearest neighbor data structure for graphics hardware.
+ADMS, 2010.
+
+
+---------------------------------------------------------------------
+FILES
+
+* brute.{h,cu} -- implementation of brute force search (CPU and GPU
+  versions) 
+* defs.h -- definitions of constants and macros, including the
+  distance metric.
+* driver.cu -- example code for using the RBC data structure.
+* kernels.{h,cu} -- implementation of all the (device) kernel functions,
+  except those related to the scan (see sKernels below)
+* kernelWrap.{h,cu} -- CPU wrapper code around the kernels.
+* rbc.{h,cu} -- the core of the RBC data structure.  Includes the
+  implementation of build and search algorithms.
+* sKernel.{h,cu} -- implementation of the kernel functions related to
+  the parallel scan algorithm (used within the build method).
+* sKernelWrap.{h,cu} -- wrappers for the kernels in sKernel.
+* utils.{h,cu} -- misc utilities used in the code.
+* utilsGPU.{h,cu} -- misc utilities related to the GPU.
+
+
+---------------------------------------------------------------------
+COMPILATION
+
+Type make in a shell.  Requires GCC and NVCC (CUDA).  The code has
+been tested under GCC 4.4 and CUDA 3.1.
+
+
+---------------------------------------------------------------------
+USE
+
+To use the RBC data structure, you will likely need to integrate this
+code into your own.  The driver.cu file provides an example of how to
+use the RBC implementation.  To try it out, type
+>testRBC
+at the prompt and a list of options will be displayed.  Currently, the
+test program assumes that the input is a single binary file, which it
+then splits into queries and a the database randomly.  Clearly, such a
+setup is only useful for testing the performance of the data
+structure.  To use the data structure in a more useful fashion, you
+may wish to call the readData function on separate files.  There is
+also a readDataText function in the driver.cu for your convenience.  
+
+The core of the implementation is in rbc.cu and in the kernel files.
+There is a buildRBC function and a queryRBC function which should
+suffice for basic use of the data structure.
+
+Currently, the kernel functions are not seriously optimized.  Indeed,
+the results appearing in the ADMS paper came from a slightly more
+optimized version than this one.  A tuned version will be available at
+some point.   
+
+
+---------------------------------------------------------------------
+MISC NOTES ON THE CODE
+
+* The code currently computes distance using the L_1 (manhattan)
+  metric.  If you wish to use a different notion of distance, you must
+  modify defs.h.  It is quite simple to switch to any metric that 
+  operates alongs the coordinates independently (eg, any L_p metric),
+  but more complex metrics will require some aditional work.  The L_2
+  metric (standard Euclidean distance) is already defined in defs.h.  
+
 * The code requires that the entire DB and query set fit into the 
-device memory.  
+  device memory.  
 
 * For the most part, device variables (ie arrays residing on the GPU)
-begin with a lowercase d.  For example, the device version of the 
-DB variable x is dx.  
+  begin with a lowercase d.  For example, the device version of the 
+  DB variable x is dx.  
 
 * The computePlan code is a bit more complex than is needed for the 
-version of the RBC search algorithm described in the paper.  The 
-search algorithm described in the paper has two steps: (1) Find the 
-closest representative to the query.  (2) Explore the points owned
-by that representative (ie the s-closest points to the representative
-in the DB).  The computePlan code is more complex to make it easy
-to try out other options.  For example, one could search the points
-owned by the *two* closest representatives to the query instead.  This
-would require only minor changes to the code.
+  version of the RBC search algorithm described in the paper.  The 
+  search algorithm described in the paper has two steps: (1) Find the 
+  closest representative to the query.  (2) Explore the points owned
+  by that representative (ie the s-closest points to the representative
+  in the DB).  The computePlan code is more complex to make it easy
+  to try out other options.  For example, one could search the points
+  owned by the *two* closest representatives to the query instead.  This
+  would require only minor changes to the code, though is currently 
+  untested.
 
-* Currently the software works only in single precision.  If you wish
-to switch to double precision, you must edit the defs.h file.  Simply 
-uncomment the lines
+* Currently the software works in single precision.  If you wish to 
+  switch to double precision, you must edit the defs.h file.  Simply 
+  uncomment the lines
 
 typedef double real;
 #define MAX_REAL DBL_MAX
@@ -59,15 +126,23 @@ make clean
 followed by another make.
 
 * This software has been tested on the following graphics cards:
-NVIDIA GTX 285
-NVIDIA Tesla c2050.
+  NVIDIA GTX 285
+  NVIDIA Tesla c2050.
 
 * This sotware has been tested under the following software setup:
-Ubuntu 9.10 (linux)
-gcc 4.4
-cuda 3.1
+  Ubuntu 9.10 (linux)
+  gcc 4.4
+  cuda 3.1
 
-Please share your experience getting it to work under Windows and
-Mac OSX!
+  Please share your experience getting it to work under Windows and
+  Mac OSX!
+
+* If you are running this code on a GPU which is also driving your
+  display: A well-known issue with CUDA code in this situation is that 
+  a process within the operating system will automatically kill 
+  kernels that have been running for more than 5-10 seconds or so.
+  You can get around this in Linux by switching out of X-Windows (often 
+  CTRL-ALT-F1 does the trick) and running the code directly from the
+  terminal.
 
 

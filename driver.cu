@@ -1,3 +1,7 @@
+/* This file is part of the Random Ball Cover (RBC) library.
+ * (C) Copyright 2010, Lawrence Cayton [lcayton@tuebingen.mpg.de]
+ */
+
 #include<stdio.h>
 #include<stdlib.h>
 #include<cuda.h>
@@ -11,20 +15,22 @@
 #include "sKernel.h"
 
 void parseInput(int,char**);
-void readData(char*,int,int,real*);
-void orgData(real*,int,int,matrix,matrix);
+void readData(char*,unint,unint,real*);
+void readDataText(char*,unint,unint,real*);
+void orgData(real*,unint,unint,matrix,matrix);
 
 
 char *dataFile, *outFile;
-int n=0, m=0, d=0, numReps=0, s=0;
-int deviceNum=0;
+unint n=0, m=0, d=0, numReps=0, s=0;
+unint deviceNum=0;
 int main(int argc, char**argv){
   real *data;
   matrix x, q;
-  int *NNs, *NNsBrute;
-  int i;
+  unint *NNs, *NNsBrute;
+  unint i;
   struct timeval tvB,tvE;
   cudaError_t cE;
+  rbcStruct rbcS;
 
   printf("*****************\n");
   printf("RANDOM BALL COVER\n");
@@ -38,7 +44,6 @@ int main(int argc, char**argv){
     printf("Unable to select device %d.. exiting. \n",deviceNum);
     exit(1);
   }
-  
   
   unsigned int memFree, memTot;
   CUcontext pctx;
@@ -57,23 +62,15 @@ int main(int argc, char**argv){
   x.r = n; x.c = d; x.pr = PAD(n); x.pc = PAD(d); x.ld = x.pc;
   q.r = m; q.c = d; q.pr = PAD(m); q.pc = PAD(d); q.ld = q.pc;
 
-  NNs = (int*)calloc( m, sizeof(*NNs) );
+  NNs = (unint*)calloc( m, sizeof(*NNs) );
   for(i=0; i<m; i++)
-    NNs[i]=-1;
-  NNsBrute = (int*)calloc( m, sizeof(*NNsBrute) );
+    NNs[i]=DUMMY_IDX;
+  NNsBrute = (unint*)calloc( m, sizeof(*NNsBrute) );
 
   readData(dataFile, (n+m), d, data);
   orgData(data, (n+m), d, x, q);
   free(data);
 
-
-  
-  /* printf("db:\n"); */
-  /* printMat(x); */
-  /* printf("\nqueries: \n"); */
-  /* printMat(q); */
-  /* printf("\n\n"); */
-  
   for(i=0;i<m;i++)
     NNs[i]=NNsBrute[i]=DUMMY_IDX;
   
@@ -83,12 +80,18 @@ int main(int argc, char**argv){
   /* gettimeofday(&tvE,NULL); */
   /* printf("\t.. time elapsed = %6.4f \n",timeDiff(tvB,tvE)); */
   
-  
   printf("\nrunning rbc..\n");
   gettimeofday(&tvB,NULL);
-  rbc(x,q,numReps,s,NNs); 
+  buildRBC(x, &rbcS, numReps, s);
   gettimeofday(&tvE,NULL);
-  printf("\t.. total time elapsed for rbc = %6.4f \n",timeDiff(tvB,tvE));
+  printf("\t.. build time for rbc = %6.4f \n",timeDiff(tvB,tvE));
+
+  gettimeofday(&tvB,NULL);
+  queryRBC(q, rbcS, NNs);
+  gettimeofday(&tvE,NULL);
+  printf("\t.. query time for rbc = %6.4f \n",timeDiff(tvB,tvE));
+
+  destroyRBC(&rbcS);
   printf("finished \n");
   
   cE = cudaGetLastError();
@@ -98,11 +101,12 @@ int main(int argc, char**argv){
 
   printf("\nComputing error rates (this might take a while)\n");
   real *ranges = (real*)calloc(q.pr,sizeof(*ranges));
-  for(i=0;i<q.r;i++)
-    ranges[i] = distL1(q,x,i,NNs[i]) - 10e-6;
-  
+  for(i=0;i<q.r;i++){
+    if(NNs[i]>n) printf("error");
+    ranges[i] = distVec(q,x,i,NNs[i]) - 10e-6;
+  }
 
-  int *cnts = (int*)calloc(q.pr,sizeof(*cnts));
+  unint *cnts = (unint*)calloc(q.pr,sizeof(*cnts));
   gettimeofday(&tvB,NULL);
   bruteRangeCount(x,q,ranges,cnts);
   gettimeofday(&tvE,NULL);
@@ -118,6 +122,7 @@ int main(int argc, char**argv){
   }
   printf("\tavg rank = %6.4f; std dev = %6.4f \n\n", mean, sqrt(var));
   printf("(range count took %6.4f) \n", timeDiff(tvB, tvE));
+
 
   if(outFile){
     FILE* fp = fopen(outFile, "a");
@@ -138,6 +143,15 @@ void parseInput(int argc, char **argv){
   int i=1;
   if(argc <= 1){
     printf("\nusage: \n  testRBC -f datafile (bin) -n numPts (DB) -m numQueries -d dim -r numReps -s numPtsPerRep [-o outFile] [-g GPU num]\n\n");
+    printf("\tdatafile     = binary file containing the data\n");
+    printf("\tnumPts       = size of database\n");
+    printf("\tnumQueries   = number of queries\n");
+    printf("\tdim          = dimensionailty\n");
+    printf("\tnumReps      = number of representatives\n");
+    printf("\tnumPtsPerRep = number of points assigned to each representative\n");
+    printf("\toutFile      = output file (optional); stored in text format\n");
+    printf("\tGPU num      = ID # of the GPU to use (optional) for multi-GPU machines\n");
+    printf("\n\n");
     exit(0);
   }
   
@@ -177,9 +191,9 @@ void parseInput(int argc, char **argv){
 }
 
 
-void readData(char *dataFile, int rows, int cols, real *data){
+void readData(char *dataFile, unint rows, unint cols, real *data){
   FILE *fp;
-  int numRead;
+  unint numRead;
 
   fp = fopen(dataFile,"r");
   if(fp==NULL){
@@ -196,15 +210,37 @@ void readData(char *dataFile, int rows, int cols, real *data){
 }
 
 
+void readDataText(char *dataFile, unint rows, unint cols, real *data){
+  FILE *fp;
+  real t;
+
+  fp = fopen(dataFile,"r");
+  if(fp==NULL){
+    fprintf(stderr,"error opening file.. exiting\n");
+    exit(1);
+  }
+    
+  for(int i=0; i<rows; i++){
+    for(int j=0; j<cols; j++){
+      if(fscanf(fp,"%f ", &t)==EOF){
+	fprintf(stderr,"error reading file.. exiting \n");
+	exit(1);
+      }
+      data[IDX( i, j, cols )]=(real)t;
+    }
+  }
+  fclose(fp);
+}
+
 //This function splits the data into two matrices, x and q, of 
 //their specified dimensions.  The data is split randomly.
 //It is assumed that the number of rows of data (the parameter n)
 //is at least as large as x.r+q.r
-void orgData(real *data, int n, int d, matrix x, matrix q){
+void orgData(real *data, unint n, unint d, matrix x, matrix q){
    
-  int i,fi,j;
-  int *p;
-  p = (int*)calloc(n,sizeof(*p));
+  unint i,fi,j;
+  unint *p;
+  p = (unint*)calloc(n,sizeof(*p));
   
   randPerm(n,p);
 

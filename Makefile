@@ -1,12 +1,12 @@
 CC=gcc
 NVCC=nvcc
 CCFLAGS=
-NVCCFLAGS= --ptxas-options=-v
+NVCCFLAGS= --ptxas-options=-v -arch=sm_20
 #other flags: -deviceemu -arch=sm_20 --compiler-bindir=/usr/bin/gcc-4.3
 LINKFLAGS=-lcuda 
 #other linkflags: 
 SOURCES=
-CUSOURCES=driver.cu utils.cu utilsGPU.cu rbc.cu kernels.cu brute.cu kernelWrap.cu sKernel.cu
+CUSOURCES= driver.cu utils.cu utilsGPU.cu rbc.cu brute.cu kernels.cu kernelWrap.cu sKernel.cu sKernelWrap.cu
 OBJECTS=$(SOURCES:.c=.o)
 CUOBJECTS=$(CUSOURCES:.cu=.o)
 EXECUTABLE=testRBC
