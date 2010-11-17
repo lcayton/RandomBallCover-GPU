@@ -162,8 +162,6 @@ __global__ void knnKernel(const matrix Q, unint numDone, const matrix X, matrix 
   __shared__ real Xs[BLOCK_SIZE][BLOCK_SIZE];
   __shared__ real Qs[BLOCK_SIZE][BLOCK_SIZE];
   
-  __shared__ real D[BLOCK_SIZE][BLOCK_SIZE];
-  __shared__ unint id[BLOCK_SIZE][BLOCK_SIZE];
   __shared__ real dNN[BLOCK_SIZE][K+BLOCK_SIZE];
   __shared__ unint idNN[BLOCK_SIZE][K+BLOCK_SIZE];
 
@@ -181,7 +179,6 @@ __global__ void knnKernel(const matrix Q, unint numDone, const matrix X, matrix 
       //Each thread loads one element of X and Q into memory.
       Xs[offX][offQ] = X.mat[IDX( xB+offQ, cB+offX, X.ld )];
       Qs[offX][offQ] = Q.mat[IDX( qB+offQ, cB+offX, Q.ld )];
-      
       __syncthreads();
       
       for(i=0;i<BLOCK_SIZE;i++)
@@ -189,38 +186,15 @@ __global__ void knnKernel(const matrix Q, unint numDone, const matrix X, matrix 
       
       __syncthreads();
     }
-    D[offQ][offX] = (xB+offX<X.r)? ans:MAX_REAL;
-    id[offQ][offX] = xB + offX;
+ 
+    dNN[offQ][offX+32] = (xB+offX<X.r)? ans:MAX_REAL;
+    idNN[offQ][offX+32] = xB + offX;
     __syncthreads();
-    
-/*     if(offX==0 && offQ==0 & qB==0){  */
-/*       printf("before sort: \n"); */
-/*       for(i=0;i<BLOCK_SIZE;i++)  */
-/* 	 printf("%6.2f ",D[0][i]);  */
-/*        printf("\n");  */
-/*      }  */
 
-    sort16( D, id );
-/*      if(offX==0 && offQ==0 & qB==0){  */
-/*        printf("after sort:\n"); */
-/*        for(i=0;i<BLOCK_SIZE;i++)  */
-/* 	 printf("%6.2f ",D[0][i]);  */
-/*        printf("\n");  */
-/*      }  */
-      
+    sort16off( dNN, idNN );
     __syncthreads();
-    dNN[offQ][offX+32] = D[offQ][offX];
-    idNN[offQ][offX+32] = id[offQ][offX];
-    __syncthreads();
+
     merge32x16( dNN, idNN );
-/*     if(offX==0 && offQ==0 & qB==0){  */
-/*       for(i=0;i<K+BLOCK_SIZE;i++) */
-/* 	printf("%6.2f ",dNN[0][i]);  */
-/*       printf("\n");  */
-    /*   for(i=0;i<K+BLOCK_SIZE;i++)  */
-/*      	printf("%d ",idNN[0][i]);  */
-     /*  printf("\n");  */
-/*     } */
   }
   __syncthreads();
   
@@ -418,6 +392,53 @@ __global__ void rangeCountKernel(const matrix Q, unint numDone, const matrix X, 
 
   if( xo==0 && q+qo<Q.r )
     counts[q+qo] = scnt[qo][0];
+}
+
+
+__device__ void sort16off(real x[][48], unint xi[][48]){
+  int i = threadIdx.x;
+  int j = threadIdx.y;
+
+  if(i%2==0)
+    mmGateI( x[j]+K+i, x[j]+K+i+1, xi[j]+K+i, xi[j]+K+i+1 );
+  __syncthreads();
+
+  if(i%4<2)
+    mmGateI( x[j]+K+i, x[j]+K+i+2, xi[j]+K+i, xi[j]+K+i+2 );
+  __syncthreads();
+
+  if(i%4==1)
+    mmGateI( x[j]+K+i, x[j]+K+i+1, xi[j]+K+i, xi[j]+K+i+1 );
+  __syncthreads();
+  
+  if(i%8<4)
+    mmGateI( x[j]+K+i, x[j]+K+i+4, xi[j]+K+i, xi[j]+K+i+4 );
+  __syncthreads();
+  
+  if(i%8==2 || i%8==3)
+    mmGateI( x[j]+K+i, x[j]+K+i+2, xi[j]+K+i, xi[j]+K+i+2 );
+  __syncthreads();
+
+  if( i%2 && i%8 != 7 ) 
+    mmGateI( x[j]+K+i, x[j]+K+i+1, xi[j]+K+i, xi[j]+K+i+1 );
+  __syncthreads();
+  
+  //0-7; 8-15 now sorted.  merge time.
+  if( i<8)
+    mmGateI( x[j]+K+i, x[j]+K+i+8, xi[j]+K+i, xi[j]+K+i+8 );
+  __syncthreads();
+  
+  if( i>3 && i<8 )
+    mmGateI( x[j]+K+i, x[j]+K+i+4, xi[j]+K+i, xi[j]+K+i+4 );
+  __syncthreads();
+  
+  int os = (i/2)*4+2 + i%2;
+  if(i<6)
+    mmGateI( x[j]+K+os, x[j]+K+os+2, xi[j]+K+os, xi[j]+K+os+2 );
+  __syncthreads();
+  
+  if( i%2 && i<15)
+    mmGateI( x[j]+K+i, x[j]+K+i+1, xi[j]+K+i, xi[j]+K+i+1 );
 }
 
 

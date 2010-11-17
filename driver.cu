@@ -78,6 +78,16 @@ int main(int argc, char**argv){
   NNsKCPU.r=q.r; NNsKCPU.pr=q.pr; NNsKCPU.pc=NNsKCPU.c=K; NNsKCPU.ld=NNsKCPU.pc;
   NNsK.mat = (unint*)calloc(NNsK.pr*NNsK.pc, sizeof(*NNsK.mat));
   NNsKCPU.mat = (unint*)calloc(NNsKCPU.pr*NNsKCPU.pc, sizeof(*NNsKCPU.mat));
+  
+  int tester[5][5];
+  int k=0;
+  int j;
+  for(i=0;i<5;i++){
+    for(j=0;j<5;j++){
+      tester[i][j]=k++;
+    }
+  }
+
 
   printf("running k-brute force..\n");
   gettimeofday(&tvB,NULL);
