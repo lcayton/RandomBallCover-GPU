@@ -87,6 +87,77 @@ __global__ void planNNKernel(const matrix Q, const unint *qMap, const matrix X, 
 }
 
 
+__global__ void planKNNKernel(const matrix Q, const unint *qMap, const matrix X, const intMatrix xMap, matrix dMins, intMatrix dMinIDs, compPlan cP,  unint qStartPos ){
+  unint qB = qStartPos + blockIdx.y * BLOCK_SIZE;  //indexes Q
+  unint xB; //X (DB) Block;
+  unint cB; //column Block
+  unint offQ = threadIdx.y; //the offset of qPos in this block
+  unint offX = threadIdx.x; //ditto for x
+  unint i,j,k;
+  unint groupIts;
+  
+  __shared__ real dNN[BLOCK_SIZE][K+BLOCK_SIZE];
+  __shared__ unint idNN[BLOCK_SIZE][K+BLOCK_SIZE];
+
+  __shared__ real Xs[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ real Qs[BLOCK_SIZE][BLOCK_SIZE];
+
+  unint g; //query group of q
+  unint xG; //DB group currently being examined
+  unint numGroups;
+  unint groupCount;
+
+  g = cP.qToQGroup[qB]; 
+  numGroups = cP.numGroups[g];
+  
+  dNN[offQ][offX] = MAX_REAL;
+  dNN[offQ][offX+16] = MAX_REAL;
+  idNN[offQ][offX] = DUMMY_IDX;
+  idNN[offQ][offX+16] = DUMMY_IDX;
+  __syncthreads();
+  
+  for(i=0; i<numGroups; i++){ //iterate over DB groups
+    xG = cP.qGroupToXGroup[IDX( g, i, cP.ld )];
+    groupCount = cP.groupCountX[IDX( g, i, cP.ld )];
+    groupIts = (groupCount+BLOCK_SIZE-1)/BLOCK_SIZE;
+
+    for(j=0; j<groupIts; j++){ //iterate over elements of group
+      xB=j*BLOCK_SIZE;
+
+      real ans=0;
+      for(cB=0; cB<X.pc; cB+=BLOCK_SIZE){ // iterate over cols to compute distances
+
+	Xs[offX][offQ] = X.mat[IDX( xMap.mat[IDX( xG, xB+offQ, xMap.ld )], cB+offX, X.ld )];
+	Qs[offX][offQ] = ( (qMap[qB+offQ]==DUMMY_IDX) ? 0 : Q.mat[IDX( qMap[qB+offQ], cB+offX, Q.ld )] );
+	__syncthreads();
+	
+	for(k=0; k<BLOCK_SIZE; k++)
+	  ans+=DIST( Xs[k][offX], Qs[k][offQ] );
+
+	__syncthreads();
+      }
+     
+      dNN[offQ][offX+32] = (xB+offX<groupCount)? ans:MAX_REAL;
+      idNN[offQ][offX+32] = xB + offX;
+      __syncthreads();
+
+      sort16off( dNN, idNN );
+      __syncthreads();
+      
+      merge32x16( dNN, idNN );
+    }
+  }
+  __syncthreads();
+  
+  if(qMap[qB+offQ]!=DUMMY_IDX){
+    dMins.mat[IDX(qMap[qB+offQ], offX, dMins.ld)] = dNN[offQ][offX];
+    dMins.mat[IDX(qMap[qB+offQ], offX+16, dMins.ld)] = dNN[offQ][offX+16];
+    dMinIDs.mat[IDX(qMap[qB+offQ], offX, dMins.ld)] = idNN[offQ][offX];
+    dMinIDs.mat[IDX(qMap[qB+offQ], offX+16, dMinIDs.ld)] = idNN[offQ][offX+16];
+  }
+}
+
+
 
 __global__ void nnKernel(const matrix Q, unint numDone, const matrix X, real *dMins, unint *dMinIDs){
 
