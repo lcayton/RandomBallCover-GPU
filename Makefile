@@ -1,9 +1,9 @@
 CC=gcc
 NVCC=nvcc
 CCFLAGS=
-NVCCFLAGS= --ptxas-options=-v
+NVCCFLAGS= --ptxas-options=-v -arch=sm_20 
 #other flags: -deviceemu -arch=sm_20 --compiler-bindir=/usr/bin/gcc-4.3
-LINKFLAGS=-lcuda 
+LINKFLAGS=-lcuda -lgsl -lgslcblas -lm
 #other linkflags: 
 SOURCES=
 CUSOURCES= driver.cu utils.cu utilsGPU.cu rbc.cu brute.cu kernels.cu kernelWrap.cu sKernel.cu sKernelWrap.cu

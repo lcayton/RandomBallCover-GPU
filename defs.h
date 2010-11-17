@@ -4,6 +4,8 @@
 #include<float.h>
 
 #define FLOAT_TOL 1e-7
+
+#define K 32 //for k-NN
 #define BLOCK_SIZE 16 //must be a power of 2 (current 
 // implementation of findRange requires a power of 4, in fact)
 
@@ -42,8 +44,10 @@ typedef float real;
 #define DPAD(i) ( ((i)%BLOCK_SIZE)==0 ? (i):((i)/BLOCK_SIZE)*BLOCK_SIZE ) 
 
 #define MAX(i,j) ((i) > (j) ? (i) : (j))
+#define MIN(i,j) ((i) <= (j) ? (i) : (j))
+#define MAXi(i,j,k,l) ((i) > (j) ? (k) : (l)) //indexed version
+#define MINi(i,j,k,l) ((i) <= (j) ? (k) : (l))
 
-#define MIN(i,j) ((i) < (j) ? (i) : (j))
 
 typedef unsigned int unint;
 

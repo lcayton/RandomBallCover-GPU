@@ -149,6 +149,87 @@ __global__ void nnKernel(const matrix Q, unint numDone, const matrix X, real *dM
 }
 
 
+__global__ void knnKernel(const matrix Q, unint numDone, const matrix X, matrix dMins, intMatrix dMinIDs){
+  
+  unint qB = blockIdx.y * BLOCK_SIZE + numDone;  //indexes Q
+  unint xB; //indexes X;
+  unint cB; //colBlock
+  unint offQ = threadIdx.y; //the offset of qPos in this block
+  unint offX = threadIdx.x; //ditto for x
+  unint i;
+  real ans;
+
+  __shared__ real Xs[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ real Qs[BLOCK_SIZE][BLOCK_SIZE];
+  
+  __shared__ real D[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ unint id[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ real dNN[BLOCK_SIZE][K+BLOCK_SIZE];
+  __shared__ unint idNN[BLOCK_SIZE][K+BLOCK_SIZE];
+
+  dNN[offQ][offX] = MAX_REAL;
+  dNN[offQ][offX+16] = MAX_REAL;
+  idNN[offQ][offX] = DUMMY_IDX;
+  idNN[offQ][offX+16] = DUMMY_IDX;
+  
+  __syncthreads();
+
+  for(xB=0; xB<X.pr; xB+=BLOCK_SIZE){
+    ans=0;
+    for(cB=0; cB<X.pc; cB+=BLOCK_SIZE){
+      
+      //Each thread loads one element of X and Q into memory.
+      Xs[offX][offQ] = X.mat[IDX( xB+offQ, cB+offX, X.ld )];
+      Qs[offX][offQ] = Q.mat[IDX( qB+offQ, cB+offX, Q.ld )];
+      
+      __syncthreads();
+      
+      for(i=0;i<BLOCK_SIZE;i++)
+	ans += DIST( Xs[i][offX], Qs[i][offQ] );
+      
+      __syncthreads();
+    }
+    D[offQ][offX] = (xB+offX<X.r)? ans:MAX_REAL;
+    id[offQ][offX] = xB + offX;
+    __syncthreads();
+    
+/*     if(offX==0 && offQ==0 & qB==0){  */
+/*       printf("before sort: \n"); */
+/*       for(i=0;i<BLOCK_SIZE;i++)  */
+/* 	 printf("%6.2f ",D[0][i]);  */
+/*        printf("\n");  */
+/*      }  */
+
+    sort16( D, id );
+/*      if(offX==0 && offQ==0 & qB==0){  */
+/*        printf("after sort:\n"); */
+/*        for(i=0;i<BLOCK_SIZE;i++)  */
+/* 	 printf("%6.2f ",D[0][i]);  */
+/*        printf("\n");  */
+/*      }  */
+      
+    __syncthreads();
+    dNN[offQ][offX+32] = D[offQ][offX];
+    idNN[offQ][offX+32] = id[offQ][offX];
+    __syncthreads();
+    merge32x16( dNN, idNN );
+/*     if(offX==0 && offQ==0 & qB==0){  */
+/*       for(i=0;i<K+BLOCK_SIZE;i++) */
+/* 	printf("%6.2f ",dNN[0][i]);  */
+/*       printf("\n");  */
+    /*   for(i=0;i<K+BLOCK_SIZE;i++)  */
+/*      	printf("%d ",idNN[0][i]);  */
+     /*  printf("\n");  */
+/*     } */
+  }
+  __syncthreads();
+  
+  dMins.mat[IDX(qB+offQ, offX, dMins.ld)] = dNN[offQ][offX];
+  dMins.mat[IDX(qB+offQ, offX+16, dMins.ld)] = dNN[offQ][offX+16];
+  dMinIDs.mat[IDX(qB+offQ, offX, dMins.ld)] = idNN[offQ][offX];
+  dMinIDs.mat[IDX(qB+offQ, offX+16, dMins.ld)] = idNN[offQ][offX+16];
+  
+}
 
 
 __global__ void dist1Kernel(const matrix Q, unint qStart, const matrix X, unint xStart, matrix D){
@@ -339,5 +420,100 @@ __global__ void rangeCountKernel(const matrix Q, unint numDone, const matrix X, 
     counts[q+qo] = scnt[qo][0];
 }
 
+
+__device__ void sort16(real x[][16], unint xi[][16]){
+  int i = threadIdx.x;
+  int j = threadIdx.y;
+
+  if(i%2==0)
+    mmGateI( x[j]+i, x[j]+i+1, xi[j]+i, xi[j]+i+1 );
+  __syncthreads();
+
+  if(i%4<2)
+    mmGateI( x[j]+i, x[j]+i+2, xi[j]+i, xi[j]+i+2 );
+  __syncthreads();
+
+  if(i%4==1)
+    mmGateI( x[j]+i, x[j]+i+1, xi[j]+i, xi[j]+i+1 );
+  __syncthreads();
+  
+  if(i%8<4)
+    mmGateI( x[j]+i, x[j]+i+4, xi[j]+i, xi[j]+i+4 );
+  __syncthreads();
+  
+  if(i%8==2 || i%8==3)
+    mmGateI( x[j]+i, x[j]+i+2, xi[j]+i, xi[j]+i+2 );
+  __syncthreads();
+
+  if( i%2 && i%8 != 7 ) 
+    mmGateI( x[j]+i, x[j]+i+1, xi[j]+i, xi[j]+i+1 );
+  __syncthreads();
+  
+  //0-7; 8-15 now sorted.  merge time.
+  if( i<8)
+    mmGateI( x[j]+i, x[j]+i+8, xi[j]+i, xi[j]+i+8 );
+  __syncthreads();
+  
+  if( i>3 && i<8 )
+    mmGateI( x[j]+i, x[j]+i+4, xi[j]+i, xi[j]+i+4 );
+  __syncthreads();
+  
+  int os = (i/2)*4+2 + i%2;
+  if(i<6)
+    mmGateI( x[j]+os, x[j]+os+2, xi[j]+os, xi[j]+os+2 );
+  __syncthreads();
+  
+  if( i%2 && i<15)
+    mmGateI( x[j]+i, x[j]+i+1, xi[j]+i, xi[j]+i+1 );
+
+}
+
+
+__device__ void merge32x16(real x[][48], unint xi[][48]){
+  int i = threadIdx.x;
+  int j = threadIdx.y;
+
+  mmGateI( x[j]+i, x[j]+i+32, xi[j]+i, xi[j]+i+32 );
+  __syncthreads();
+
+  mmGateI( x[j]+i+16, x[j]+i+32, xi[j]+i+16, xi[j]+i+32 );
+  __syncthreads();
+
+  int os = (i<8)? 24: 0;
+  mmGateI( x[j]+os+i, x[j]+os+i+8, xi[j]+os+i, xi[j]+os+i+8 );
+  __syncthreads();
+  
+  os = (i/4)*8+4 + i%4;
+  mmGateI( x[j]+os, x[j]+os+4, xi[j]+os, xi[j]+os+4 );
+  if(i<4)
+    mmGateI(x[j]+36+i, x[j]+36+i+4, xi[j]+36+i, xi[j]+36+i+4 );
+  __syncthreads();
+
+  os = (i/2)*4+2 + i%2;
+  mmGateI( x[j]+os, x[j]+os+2, xi[j]+os, xi[j]+os+2 );
+  
+  os = (i/2)*4+34 + i%2;
+  if(i<6)
+    mmGateI( x[j]+os, x[j]+os+2, xi[j]+os, xi[j]+os+2 );
+  __syncthreads();
+
+  os = 2*i+1;
+  mmGateI(x[j]+os, x[j]+os+1, xi[j]+os, xi[j]+os+1 );
+
+  os = 2*i+33;
+  if(i<7)
+    mmGateI(x[j]+os, x[j]+os+1, xi[j]+os, xi[j]+os+1 );
+
+}
+
+
+__device__ void mmGateI(real *x, real *y, unint *xi, unint *yi){
+  int ti = MINi( *x, *y, *xi, *yi );
+  *yi = MAXi( *x, *y, *xi, *yi );
+  *xi = ti;
+  real t = MIN( *x, *y );
+  *y = MAX( *x, *y );
+  *x = t;
+}
 
 #endif

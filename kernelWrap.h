@@ -11,6 +11,7 @@ void kMinsWrap(matrix,matrix,intMatrix);
 void findRangeWrap(const matrix,real*,unint);
 void rangeSearchWrap(const matrix,const real*,charMatrix);
 void nnWrap(const matrix,const matrix,real*,unint*);
+void knnWrap(const matrix,const matrix,matrix,intMatrix);
 void rangeCountWrap(const matrix,const matrix,real*,unint*);
 void planNNWrap(const matrix,const unint*,const matrix,const intMatrix,real*,unint*,compPlan,unint);
 

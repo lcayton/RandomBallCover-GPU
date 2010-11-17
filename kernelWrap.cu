@@ -92,6 +92,25 @@ void nnWrap(const matrix dq, const matrix dx, real *dMins, unint *dMinIDs){
 }
 
 
+void knnWrap(const matrix dq, const matrix dx, matrix dMins, intMatrix dMinIDs){
+  dim3 block(BLOCK_SIZE,BLOCK_SIZE);
+  dim3 grid;
+  unint numDone, todo;
+  
+  grid.x = 1;
+
+  numDone = 0;
+  while( numDone < dq.pr ){
+    todo = MIN( dq.pr - numDone, MAX_BS*BLOCK_SIZE );
+    grid.y = todo/BLOCK_SIZE;
+    knnKernel<<<grid,block>>>(dq,numDone,dx,dMins,dMinIDs);
+    numDone += todo;
+  }
+  cudaThreadSynchronize();
+
+}
+
+
 void planNNWrap(const matrix dq, const unint *dqMap, const matrix dx, const intMatrix dxMap, real *dMins, unint *dMinIDs, compPlan dcP, unint compLength){
   dim3 block(BLOCK_SIZE,BLOCK_SIZE);
   dim3 grid;
