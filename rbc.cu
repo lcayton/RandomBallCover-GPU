@@ -67,6 +67,57 @@ void queryRBC(const matrix q, const rbcStruct rbcS, unint *NNs){
 }
 
 
+void kqueryRBC(const matrix q, const rbcStruct rbcS, intMatrix NNs){
+  unint m = q.r;
+  unint numReps = rbcS.dr.r;
+  unint compLength;
+  compPlan dcP;
+  unint *qMap, *dqMap;
+  qMap = (unint*)calloc(PAD(m+(BLOCK_SIZE-1)*PAD(numReps)),sizeof(*qMap));
+  matrix dq;
+  copyAndMove(&dq, &q);
+  
+  charMatrix cM;
+  cM.r=cM.c=numReps; cM.pr=cM.pc=cM.ld=PAD(numReps);
+  cM.mat = (char*)calloc( cM.pr*cM.pc, sizeof(*cM.mat) );
+  
+  unint *repIDsQ;
+  repIDsQ = (unint*)calloc( m, sizeof(*repIDsQ) );
+  real *distToRepsQ;
+  distToRepsQ = (real*)calloc( m, sizeof(*distToRepsQ) );
+  unint *groupCountQ;
+  groupCountQ = (unint*)calloc( PAD(numReps), sizeof(*groupCountQ) );
+  
+  computeReps(dq, rbcS.dr, repIDsQ, distToRepsQ);
+
+  //How many points are assigned to each group?
+  computeCounts(repIDsQ, m, groupCountQ);
+  
+  //Set up the mapping from groups to queries (qMap).
+  buildQMap(q, qMap, repIDsQ, numReps, &compLength);
+  
+  // Setup the computation matrix.  Currently, the computation matrix is 
+  // just the identity matrix: each query assigned to a particular 
+  // representative is compared only to that representative's points.  
+  idIntersection(cM);
+
+  initCompPlan(&dcP, cM, groupCountQ, rbcS.groupCount, numReps);
+
+  checkErr( cudaMalloc( (void**)&dqMap, compLength*sizeof(*dqMap) ) );
+  cudaMemcpy( dqMap, qMap, compLength*sizeof(*dqMap), cudaMemcpyHostToDevice );
+  
+  computeKNNs(rbcS.dx, rbcS.dxMap, dq, dqMap, dcP, NNs, compLength);
+
+  free(qMap);
+  freeCompPlan(&dcP);
+  cudaFree(dq.mat);
+  free(cM.mat);
+  free(repIDsQ);
+  free(distToRepsQ);
+  free(groupCountQ);
+}
+
+
 void buildRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
   //const matrix dr, intMatrix xmap, unint *counts, unint s){
   unint n = x.pr;
@@ -247,7 +298,6 @@ void idIntersection(charMatrix cM){
 }
 
 
-
 void fullIntersection(charMatrix cM){
   unint i,j;
   for(i=0;i<cM.r;i++){
@@ -268,9 +318,26 @@ void computeNNs(matrix dx, intMatrix dxMap, matrix dq, unint *dqMap, compPlan dc
   planNNWrap(dq, dqMap, dx, dxMap, dMins, dMinIDs, dcP, compLength);
   cudaMemcpy( NNs, dMinIDs, dq.r*sizeof(*NNs), cudaMemcpyDeviceToHost);
   
-      
   cudaFree(dMins);
   cudaFree(dMinIDs);
+}
+
+
+void computeKNNs(matrix dx, intMatrix dxMap, matrix dq, unint *dqMap, compPlan dcP, intMatrix NNs, unint compLength){
+  matrix dMins;
+  intMatrix dMinIDs;
+  dMins.r=compLength; dMins.pr=compLength; dMins.c=K; dMins.pc=K; dMins.ld=dMins.pc;
+  dMinIDs.r=compLength; dMinIDs.pr=compLength; dMinIDs.c=K; dMinIDs.pc=K; dMinIDs.ld=dMinIDs.pc;
+
+  checkErr( cudaMalloc((void**)&dMins.mat,dMins.pr*dMins.pc*sizeof(*dMins.mat)) );
+  checkErr( cudaMalloc((void**)&dMinIDs.mat,dMinIDs.pr*dMinIDs.pc*sizeof(*dMinIDs.mat)) );
+
+  planKNNWrap(dq, dqMap, dx, dxMap, dMins, dMinIDs, dcP, compLength);
+  cudaMemcpy( NNs.mat, dMinIDs.mat, dq.r*K*sizeof(*NNs.mat), cudaMemcpyDeviceToHost);
+
+  
+  cudaFree(dMins.mat);
+  cudaFree(dMinIDs.mat);
 }
 
 

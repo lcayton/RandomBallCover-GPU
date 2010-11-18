@@ -138,7 +138,7 @@ __global__ void planKNNKernel(const matrix Q, const unint *qMap, const matrix X,
       }
      
       dNN[offQ][offX+32] = (xB+offX<groupCount)? ans:MAX_REAL;
-      idNN[offQ][offX+32] = xB + offX;
+      idNN[offQ][offX+32] = (xB+offX<groupCount)? xMap.mat[IDX( xG, xB+offX, xMap.ld )]: DUMMY_IDX; 
       __syncthreads();
 
       sort16off( dNN, idNN );

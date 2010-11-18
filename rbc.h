@@ -10,8 +10,8 @@
 
 void buildRBC(const matrix,rbcStruct*,unint, unint);
 void queryRBC(const matrix,const rbcStruct,unint*);
+void kqueryRBC(const matrix,const rbcStruct,intMatrix);
 void destroyRBC(rbcStruct*);
-
 void distSubMat(matrix,matrix,matrix,unint,unint);
 void computeReps(matrix,matrix,unint*,real*);
 void computeRadii(unint*,real*,real*,unint,unint);
@@ -22,6 +22,7 @@ void fullIntersection(charMatrix);
 void initCompPlan(compPlan*,charMatrix,unint*,unint*,unint);
 void freeCompPlan(compPlan*);
 void computeNNs(matrix,intMatrix,matrix,unint*,compPlan,unint*,unint);
+void computeKNNs(matrix,intMatrix,matrix,unint*,compPlan,intMatrix,unint);
 void setupReps(matrix,rbcStruct*,int);
 
 #endif

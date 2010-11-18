@@ -18,7 +18,8 @@ void parseInput(int,char**);
 void readData(char*,unint,unint,real*);
 void readDataText(char*,unint,unint,real*);
 void orgData(real*,unint,unint,matrix,matrix);
-
+void evalNNerror(matrix, matrix, unint*);
+void evalKNNerror(matrix,matrix,intMatrix);
 
 char *dataFile, *outFile;
 unint n=0, m=0, d=0, numReps=0, s=0;
@@ -27,7 +28,7 @@ int main(int argc, char**argv){
   real *data;
   matrix x, q;
   unint *NNs;
-  intMatrix NNsK, NNsKCPU;
+  intMatrix NNsK, NNsKCPU, kNNsRBC;
   unint i;
   struct timeval tvB,tvE;
   cudaError_t cE;
@@ -76,92 +77,66 @@ int main(int argc, char**argv){
   
   NNsK.r=q.r; NNsK.pr=q.pr; NNsK.pc=NNsK.c=K; NNsK.ld=NNsK.pc;
   NNsKCPU.r=q.r; NNsKCPU.pr=q.pr; NNsKCPU.pc=NNsKCPU.c=K; NNsKCPU.ld=NNsKCPU.pc;
+  kNNsRBC.r=q.r; kNNsRBC.pr=q.pr; kNNsRBC.pc=kNNsRBC.c=K; kNNsRBC.ld=kNNsRBC.pc;
+  kNNsRBC.mat = (unint*)calloc(kNNsRBC.pr*kNNsRBC.pc, sizeof(*kNNsRBC.mat));
   NNsK.mat = (unint*)calloc(NNsK.pr*NNsK.pc, sizeof(*NNsK.mat));
   NNsKCPU.mat = (unint*)calloc(NNsKCPU.pr*NNsKCPU.pc, sizeof(*NNsKCPU.mat));
-  
-  int tester[5][5];
-  int k=0;
-  int j;
-  for(i=0;i<5;i++){
-    for(j=0;j<5;j++){
-      tester[i][j]=k++;
-    }
-  }
 
-
-  printf("running k-brute force..\n");
-  gettimeofday(&tvB,NULL);
-  bruteK(x,q,NNsK);
-  gettimeofday(&tvE,NULL);
-  printf("\t.. time elapsed = %6.4f \n",timeDiff(tvB,tvE));
-
-  printf("running regular brute force..\n");
-  gettimeofday(&tvB,NULL);
-  bruteSearch(x,q,NNs);
-  gettimeofday(&tvE,NULL);
-  printf("\t.. time elapsed = %6.4f \n",timeDiff(tvB,tvE));
-
-
-  printf("running cpu version..\n");
-  gettimeofday(&tvB,NULL);
-  bruteKCPU(x,q,NNsKCPU);
-  gettimeofday(&tvE,NULL);
-  printf("\t.. time elapsed = %6.4f \n",timeDiff(tvB,tvE));
-
-
-  /* printf("\nrunning rbc..\n"); */
+  /* printf("running k-brute force..\n"); */
   /* gettimeofday(&tvB,NULL); */
-  /* buildRBC(x, &rbcS, numReps, s); */
+  /* bruteK(x,q,NNsK); */
   /* gettimeofday(&tvE,NULL); */
-  /* printf("\t.. build time for rbc = %6.4f \n",timeDiff(tvB,tvE)); */
+  /* printf("\t.. time elapsed = %6.4f \n",timeDiff(tvB,tvE)); */
+
+  /* printf("running regular brute force..\n"); */
+  /* gettimeofday(&tvB,NULL); */
+  /* bruteSearch(x,q,NNs); */
+  /* gettimeofday(&tvE,NULL); */
+  /* printf("\t.. time elapsed = %6.4f \n",timeDiff(tvB,tvE)); */
+
+
+  /* printf("running cpu version..\n"); */
+  /* gettimeofday(&tvB,NULL); */
+  /* bruteKCPU(x,q,NNsKCPU); */
+  /* gettimeofday(&tvE,NULL); */
+  /* printf("\t.. time elapsed = %6.4f \n",timeDiff(tvB,tvE)); */
+
+
+  printf("\nrunning rbc..\n");
+  gettimeofday(&tvB,NULL);
+  buildRBC(x, &rbcS, numReps, s);
+  gettimeofday(&tvE,NULL);
+  printf("\t.. build time for rbc = %6.4f \n",timeDiff(tvB,tvE));
 
   /* gettimeofday(&tvB,NULL); */
   /* queryRBC(q, rbcS, NNs); */
   /* gettimeofday(&tvE,NULL); */
   /* printf("\t.. query time for rbc = %6.4f \n",timeDiff(tvB,tvE)); */
 
-  /* destroyRBC(&rbcS); */
-  /* printf("finished \n") */;
+  gettimeofday(&tvB,NULL);
+  kqueryRBC(q, rbcS, kNNsRBC);
+  gettimeofday(&tvE,NULL);
+  printf("\t.. query time for krbc = %6.4f \n",timeDiff(tvB,tvE));
+  
+  destroyRBC(&rbcS);
+  printf("finished \n");
   
   cE = cudaGetLastError();
   if( cE != cudaSuccess ){
     printf("Execution failed; error type: %s \n", cudaGetErrorString(cE) );
   }
-
-  for(i=0;i<q.r;i++){
-    int j;
-    for(j=0;j<K;j++){
-      if(NNsK.mat[IDX(i,j,NNsK.ld)] != NNsKCPU.mat[IDX(i,j,NNsKCPU.ld)])
-	printf("%d %d: (%6.2f %6.2f) ",i,j,distVec(q,x,i,NNsK.mat[IDX(i,j,NNsK.ld)]),distVec(q,x,i,NNsKCPU.mat[IDX(i,j,NNsKCPU.ld)]));
-    }
- /*    printf("\n"); */
-  }
- 
-  /* printf("\nComputing error rates (this might take a while)\n"); */
-  /* real *ranges = (real*)calloc(q.pr,sizeof(*ranges)); */
-  /* for(i=0;i<q.r;i++){ */
-  /*   if(NNs[i]>n) printf("error"); */
-  /*   ranges[i] = distVec(q,x,i,NNs[i]) - 10e-6; */
-  /* } */
-
-  /* unint *cnts = (unint*)calloc(q.pr,sizeof(*cnts)); */
-  /* gettimeofday(&tvB,NULL); */
-  /* bruteRangeCount(x,q,ranges,cnts); */
-  /* gettimeofday(&tvE,NULL); */
   
-  /* long int nc=0; */
-  /* for(i=0;i<m;i++){ */
-  /*   nc += cnts[i]; */
-  /* } */
-  /* double mean = ((double)nc)/((double)m); */
-  /* double var = 0.0; */
-  /* for(i=0;i<m;i++) { */
-  /*   var += (((double)cnts[i])-mean)*(((double)cnts[i])-mean)/((double)m); */
-  /* } */
-  /* printf("\tavg rank = %6.4f; std dev = %6.4f \n\n", mean, sqrt(var)); */
-  /* printf("(range count took %6.4f) \n", timeDiff(tvB, tvE)); */
+  evalKNNerror(x,q,kNNsRBC);
 
-
+/* for(i=0;i<q.r;i++){ */
+    /* int j; */
+ /*    for(j=0;j<K;j++){ */
+ /*      if(NNsK.mat[IDX(i,j,NNsK.ld)] != kNNsRBC.mat[IDX(i,j,kNNsRBC.ld)]) */
+ /* 	printf("%d %d: (%d: %6.2f %d: %6.2f) ",i,j,NNsK.mat[IDX(i,j,NNsK.ld)],distVec(q,x,i,NNsK.mat[IDX(i,j,NNsK.ld)]),kNNsRBC.mat[IDX(i,j,kNNsRBC.ld)] ,distVec(q,x,i,kNNsRBC.mat[IDX(i,j,kNNsRBC.ld)])); */
+ /*    } */
+ /* /\*    printf("\n"); *\/ */
+ /*  } */
+ 
   /* if(outFile){ */
   /*   FILE* fp = fopen(outFile, "a"); */
   /*   fprintf( fp, "%d %d %6.5f %6.5f \n", numReps, s, mean, sqrt(var) ); */
@@ -298,3 +273,102 @@ void orgData(real *data, unint n, unint d, matrix x, matrix q){
   free(p);
 }
 
+
+//find the error rate of a set of NNs, then print it.
+void evalNNerror(matrix x, matrix q, unint *NNs){
+  struct timeval tvB, tvE;
+  unint i;
+
+  printf("\nComputing error rates (this might take a while)\n");
+  real *ranges = (real*)calloc(q.pr,sizeof(*ranges));
+  for(i=0;i<q.r;i++){
+    if(NNs[i]>n) printf("error");
+    ranges[i] = distVec(q,x,i,NNs[i]) - 10e-6;
+  }
+
+  unint *cnts = (unint*)calloc(q.pr,sizeof(*cnts));
+  gettimeofday(&tvB,NULL);
+  bruteRangeCount(x,q,ranges,cnts);
+  gettimeofday(&tvE,NULL);
+  
+  long int nc=0;
+  for(i=0;i<m;i++){
+    nc += cnts[i];
+  }
+  double mean = ((double)nc)/((double)m);
+  double var = 0.0;
+  for(i=0;i<m;i++) {
+    var += (((double)cnts[i])-mean)*(((double)cnts[i])-mean)/((double)m);
+  }
+  printf("\tavg rank = %6.4f; std dev = %6.4f \n\n", mean, sqrt(var));
+  printf("(range count took %6.4f) \n", timeDiff(tvB, tvE));
+}
+
+
+//evals the error rate of k-nns
+void evalKNNerror(matrix x, matrix q, intMatrix NNs){
+  struct timeval tvB, tvE;
+  unint i,j,k;
+
+  unint m = q.r;
+  printf("\nComputing error rates (this might take a while)\n");
+  
+  unint *ol = (unint*)calloc( q.r, sizeof(*ol) );
+  
+
+  intMatrix NNsB;
+  NNsB.r=q.r; NNsB.pr=q.pr; NNsB.c=NNsB.pc=32; NNsB.ld=NNsB.pc;
+  NNsB.mat = (unint*)calloc( NNsB.pr*NNsB.pc, sizeof(*NNsB.mat) );
+  
+  gettimeofday(&tvB,NULL);
+  bruteK(x,q,NNsB);
+  gettimeofday(&tvE,NULL);
+
+   //calc overlap
+  for(i=0; i<m; i++){
+    for(j=0; j<K; j++){
+      for(k=0; k<K; k++){
+	ol[i] += ( NNs.mat[IDX(i, j, NNs.ld)] == NNsB.mat[IDX(i, k, NNsB.ld)] );
+      }
+    }
+  }
+
+  long int nc=0;
+  for(i=0;i<m;i++){
+    nc += ol[i];
+  }
+
+  double mean = ((double)nc)/((double)m);
+  double var = 0.0;
+  for(i=0;i<m;i++) {
+    var += (((double)ol[i])-mean)*(((double)ol[i])-mean)/((double)m);
+  }
+  printf("\tavg overlap = %6.4f/%d; std dev = %6.4f \n", mean, K, sqrt(var));
+  
+  
+  real *ranges = (real*)calloc(q.pr,sizeof(*ranges));
+  for(i=0;i<q.r;i++){
+    ranges[i] = distVec(q,x,i,NNs.mat[IDX(i, K-1, NNs.ld)]);
+  }
+  
+  unint *cnts = (unint*)calloc(q.pr,sizeof(*cnts));
+  bruteRangeCount(x,q,ranges,cnts);
+  
+  nc=0;
+  for(i=0;i<m;i++){
+    nc += cnts[i];
+  }
+  mean = ((double)nc)/((double)m);
+  var = 0.0;
+  for(i=0;i<m;i++) {
+    var += (((double)cnts[i])-mean)*(((double)cnts[i])-mean)/((double)m);
+  }
+  printf("\tavg actual rank of 32nd NN returned by the RBC = %6.4f; std dev = %6.4f \n\n", mean, sqrt(var));
+
+
+  printf("(brute k-nn took %6.4f) \n", timeDiff(tvB, tvE));
+
+  free(cnts);
+  free(ol);
+  free(NNsB.mat);
+}

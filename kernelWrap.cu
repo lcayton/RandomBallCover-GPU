@@ -128,6 +128,24 @@ void planNNWrap(const matrix dq, const unint *dqMap, const matrix dx, const intM
 }
 
 
+void planKNNWrap(const matrix dq, const unint *dqMap, const matrix dx, const intMatrix dxMap, matrix dMins, intMatrix dMinIDs, compPlan dcP, unint compLength){
+  dim3 block(BLOCK_SIZE,BLOCK_SIZE);
+  dim3 grid;
+  unint todo;
+
+  grid.x = 1;
+  unint numDone = 0;
+  while( numDone<compLength ){
+    todo = MIN( (compLength-numDone) , MAX_BS*BLOCK_SIZE );
+    grid.y = todo/BLOCK_SIZE;
+    planKNNKernel<<<grid,block>>>(dq,dqMap,dx,dxMap,dMins,dMinIDs,dcP,numDone);
+    numDone += todo;
+  }
+  cudaThreadSynchronize();
+}
+
+
+
 void rangeCountWrap(const matrix dq, const matrix dx, real *dranges, unint *dcounts){
   dim3 block(BLOCK_SIZE,BLOCK_SIZE);
   dim3 grid;

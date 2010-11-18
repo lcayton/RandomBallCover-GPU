@@ -14,5 +14,6 @@ void nnWrap(const matrix,const matrix,real*,unint*);
 void knnWrap(const matrix,const matrix,matrix,intMatrix);
 void rangeCountWrap(const matrix,const matrix,real*,unint*);
 void planNNWrap(const matrix,const unint*,const matrix,const intMatrix,real*,unint*,compPlan,unint);
+void planKNNWrap(const matrix,const unint*,const matrix,const intMatrix,matrix,intMatrix,compPlan,unint);
 
 #endif
