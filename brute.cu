@@ -14,7 +14,7 @@
 #include "brute.h"
 #include<stdio.h>
 #include<cuda.h>
-#include<gsl/gsl_sort.h>
+//#include<gsl/gsl_sort.h>
 
 void bruteRangeCount(matrix x, matrix q, real *ranges, unint *cnts){
   matrix dx, dq;
@@ -121,32 +121,36 @@ void bruteCPU(matrix X, matrix Q, unint *NNs){
 }
 
 
-void bruteKCPU(matrix x, matrix q, intMatrix NNs){
-  int i, j;
+//The following method works properly, but requires the GNU scientific
+//library.  If you want to use it, uncomment the code, uncomment the include
+//above, and adjust the makefile.  It was used for debugging purposes, but
+//is not required by anything else.
 
-  float **d;
-  d = (float**)calloc(q.pr, sizeof(*d));
-  size_t **t;
-  t = (size_t**)calloc(q.pr, sizeof(*t));
-  for( i=0; i<q.pr; i++){
-    d[i] = (float*)calloc(x.pr, sizeof(**d));
-    t[i] = (size_t*)calloc(x.pr, sizeof(**t));
-  }
+/* void bruteKCPU(matrix x, matrix q, intMatrix NNs){ */
+/*   int i, j; */
 
-  //#pragma omp parallel for private(j)
-  for( i=0; i<q.r; i++){
-    for( j=0; j<x.r; j++)
-      d[i][j] = distVec( q, x, i, j );
-    gsl_sort_float_index(t[i], d[i], 1, x.r);
-    for ( j=0; j<K; j++)
-      NNs.mat[IDX( i, j, NNs.ld )] = t[i][j];
-  }
+/*   float **d; */
+/*   d = (float**)calloc(q.pr, sizeof(*d)); */
+/*   size_t **t; */
+/*   t = (size_t**)calloc(q.pr, sizeof(*t)); */
+/*   for( i=0; i<q.pr; i++){ */
+/*     d[i] = (float*)calloc(x.pr, sizeof(**d)); */
+/*     t[i] = (size_t*)calloc(x.pr, sizeof(**t)); */
+/*   } */
 
-  for( i=0; i<q.pr; i++){
-    free(t[i]);
-    free(d[i]);
-  }
-  free(t);
-  free(d);
-}
+/*   for( i=0; i<q.r; i++){ */
+/*     for( j=0; j<x.r; j++) */
+/*       d[i][j] = distVec( q, x, i, j ); */
+/*     gsl_sort_float_index(t[i], d[i], 1, x.r); */
+/*     for ( j=0; j<K; j++) */
+/*       NNs.mat[IDX( i, j, NNs.ld )] = t[i][j]; */
+/*   } */
+
+/*   for( i=0; i<q.pr; i++){ */
+/*     free(t[i]); */
+/*     free(d[i]); */
+/*   } */
+/*   free(t); */
+/*   free(d); */
+/* } */
 #endif

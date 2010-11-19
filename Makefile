@@ -3,8 +3,10 @@ NVCC=nvcc
 CCFLAGS=
 NVCCFLAGS= --ptxas-options=-v
 #other flags: -deviceemu -arch=sm_20 --compiler-bindir=/usr/bin/gcc-4.3
-LINKFLAGS=-lcuda -lgsl -lgslcblas -lm
-#other linkflags: 
+#These are useful when debugging sometimes.  
+LINKFLAGS=-lcuda  -lm
+#other linkflags: -lgsl -lgslcblas 
+# lgsl and lgslcblas are required if you want to use the GSL. 
 SOURCES=
 CUSOURCES= driver.cu utils.cu utilsGPU.cu rbc.cu brute.cu kernels.cu kernelWrap.cu sKernel.cu sKernelWrap.cu
 OBJECTS=$(SOURCES:.c=.o)
