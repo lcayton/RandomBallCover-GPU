@@ -1,0 +1,5 @@
+0.2 nov 2010
+    Added support for k-NN queries, for k <= 32.  
+
+0.1 aug 2010 
+    Initial release.

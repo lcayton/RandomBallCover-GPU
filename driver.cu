@@ -28,7 +28,7 @@ int main(int argc, char**argv){
   real *data;
   matrix x, q;
   unint *NNs;
-  intMatrix NNsK, NNsKCPU, kNNsRBC;
+  intMatrix NNsK, kNNsRBC;
   unint i;
   struct timeval tvB,tvE;
   cudaError_t cE;
@@ -72,35 +72,16 @@ int main(int argc, char**argv){
   orgData(data, (n+m), d, x, q);
   free(data);
 
-  for(i=0;i<m;i++)
-    NNs[i]=DUMMY_IDX;
-  
   NNsK.r=q.r; NNsK.pr=q.pr; NNsK.pc=NNsK.c=K; NNsK.ld=NNsK.pc;
-  NNsKCPU.r=q.r; NNsKCPU.pr=q.pr; NNsKCPU.pc=NNsKCPU.c=K; NNsKCPU.ld=NNsKCPU.pc;
   kNNsRBC.r=q.r; kNNsRBC.pr=q.pr; kNNsRBC.pc=kNNsRBC.c=K; kNNsRBC.ld=kNNsRBC.pc;
   kNNsRBC.mat = (unint*)calloc(kNNsRBC.pr*kNNsRBC.pc, sizeof(*kNNsRBC.mat));
   NNsK.mat = (unint*)calloc(NNsK.pr*NNsK.pc, sizeof(*NNsK.mat));
-  NNsKCPU.mat = (unint*)calloc(NNsKCPU.pr*NNsKCPU.pc, sizeof(*NNsKCPU.mat));
-
+  
   /* printf("running k-brute force..\n"); */
   /* gettimeofday(&tvB,NULL); */
   /* bruteK(x,q,NNsK); */
   /* gettimeofday(&tvE,NULL); */
   /* printf("\t.. time elapsed = %6.4f \n",timeDiff(tvB,tvE)); */
-
-  /* printf("running regular brute force..\n"); */
-  /* gettimeofday(&tvB,NULL); */
-  /* bruteSearch(x,q,NNs); */
-  /* gettimeofday(&tvE,NULL); */
-  /* printf("\t.. time elapsed = %6.4f \n",timeDiff(tvB,tvE)); */
-
-
-  /* printf("running cpu version..\n"); */
-  /* gettimeofday(&tvB,NULL); */
-  /* bruteKCPU(x,q,NNsKCPU); */
-  /* gettimeofday(&tvE,NULL); */
-  /* printf("\t.. time elapsed = %6.4f \n",timeDiff(tvB,tvE)); */
-
 
   printf("\nrunning rbc..\n");
   gettimeofday(&tvB,NULL);
@@ -108,11 +89,7 @@ int main(int argc, char**argv){
   gettimeofday(&tvE,NULL);
   printf("\t.. build time for rbc = %6.4f \n",timeDiff(tvB,tvE));
 
-  /* gettimeofday(&tvB,NULL); */
-  /* queryRBC(q, rbcS, NNs); */
-  /* gettimeofday(&tvE,NULL); */
-  /* printf("\t.. query time for rbc = %6.4f \n",timeDiff(tvB,tvE)); */
-
+  //This finds the 32-NN; if you are only interested in the 1-NN, use queryRBC(..) instead
   gettimeofday(&tvB,NULL);
   kqueryRBC(q, rbcS, kNNsRBC);
   gettimeofday(&tvE,NULL);
@@ -128,26 +105,9 @@ int main(int argc, char**argv){
   
   evalKNNerror(x,q,kNNsRBC);
 
-/* for(i=0;i<q.r;i++){ */
-    /* int j; */
- /*    for(j=0;j<K;j++){ */
- /*      if(NNsK.mat[IDX(i,j,NNsK.ld)] != kNNsRBC.mat[IDX(i,j,kNNsRBC.ld)]) */
- /* 	printf("%d %d: (%d: %6.2f %d: %6.2f) ",i,j,NNsK.mat[IDX(i,j,NNsK.ld)],distVec(q,x,i,NNsK.mat[IDX(i,j,NNsK.ld)]),kNNsRBC.mat[IDX(i,j,kNNsRBC.ld)] ,distVec(q,x,i,kNNsRBC.mat[IDX(i,j,kNNsRBC.ld)])); */
- /*    } */
- /* /\*    printf("\n"); *\/ */
- /*  } */
- 
-  /* if(outFile){ */
-  /*   FILE* fp = fopen(outFile, "a"); */
-  /*   fprintf( fp, "%d %d %6.5f %6.5f \n", numReps, s, mean, sqrt(var) ); */
-  /*   fclose(fp); */
-  /* } */
-
-  /* free(ranges); */
-  /* free(cnts); */
   free(NNs);
   free(NNsK.mat);
-  free(NNsKCPU.mat);
+  free(kNNsRBC.mat);
   free(x.mat);
   free(q.mat);
 }
@@ -302,6 +262,15 @@ void evalNNerror(matrix x, matrix q, unint *NNs){
   }
   printf("\tavg rank = %6.4f; std dev = %6.4f \n\n", mean, sqrt(var));
   printf("(range count took %6.4f) \n", timeDiff(tvB, tvE));
+  
+  if(outFile){
+    FILE* fp = fopen(outFile, "a");
+    fprintf( fp, "%d %d %6.5f %6.5f \n", numReps, s, mean, sqrt(var) );
+    fclose(fp);
+  }
+
+  free(ranges);
+  free(cnts);
 }
 
 
@@ -315,7 +284,6 @@ void evalKNNerror(matrix x, matrix q, intMatrix NNs){
   
   unint *ol = (unint*)calloc( q.r, sizeof(*ol) );
   
-
   intMatrix NNsB;
   NNsB.r=q.r; NNsB.pr=q.pr; NNsB.c=NNsB.pc=32; NNsB.ld=NNsB.pc;
   NNsB.mat = (unint*)calloc( NNsB.pr*NNsB.pc, sizeof(*NNsB.mat) );
@@ -344,8 +312,13 @@ void evalKNNerror(matrix x, matrix q, intMatrix NNs){
     var += (((double)ol[i])-mean)*(((double)ol[i])-mean)/((double)m);
   }
   printf("\tavg overlap = %6.4f/%d; std dev = %6.4f \n", mean, K, sqrt(var));
-  
-  
+
+  FILE* fp;
+  if(outFile){
+    fp = fopen(outFile, "a");
+    fprintf( fp, "%d %d %6.5f %6.5f ", numReps, s, mean, sqrt(var) );
+  }
+
   real *ranges = (real*)calloc(q.pr,sizeof(*ranges));
   for(i=0;i<q.r;i++){
     ranges[i] = distVec(q,x,i,NNs.mat[IDX(i, K-1, NNs.ld)]);
@@ -364,9 +337,12 @@ void evalKNNerror(matrix x, matrix q, intMatrix NNs){
     var += (((double)cnts[i])-mean)*(((double)cnts[i])-mean)/((double)m);
   }
   printf("\tavg actual rank of 32nd NN returned by the RBC = %6.4f; std dev = %6.4f \n\n", mean, sqrt(var));
-
-
   printf("(brute k-nn took %6.4f) \n", timeDiff(tvB, tvE));
+
+  if(outFile){
+    fprintf( fp, "%6.5f %6.5f \n", mean, sqrt(var) );
+    fclose(fp);
+  }
 
   free(cnts);
   free(ol);

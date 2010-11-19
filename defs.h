@@ -5,7 +5,7 @@
 
 #define FLOAT_TOL 1e-7
 
-#define K 32 //for k-NN
+#define K 32 //for k-NN.  Do not change!
 #define BLOCK_SIZE 16 //must be a power of 2 (current 
 // implementation of findRange requires a power of 4, in fact)
 

@@ -1,4 +1,4 @@
-***Random Ball Cover (RBC)***
+***Random Ball Cover (RBC) v0.2***
 Lawrence Cayton
 lcayton@tuebingen.mpg.de
 
@@ -70,13 +70,13 @@ may wish to call the readData function on separate files.  There is
 also a readDataText function in the driver.cu for your convenience.  
 
 The core of the implementation is in rbc.cu and in the kernel files.
-There is a buildRBC function and a queryRBC function which should
-suffice for basic use of the data structure.
+There is a buildRBC function, a queryRBC function, and a kqueryRBC
+function, which together should suffice for basic use of the data
+structure.   
 
-Currently, the kernel functions are not seriously optimized.  Indeed,
-the results appearing in the ADMS paper came from a slightly more
-optimized version than this one.  A tuned version will be available at
-some point.   
+Currently, the kernel functions are reasonably optimized, but can be
+improved.  Indeed, the results appearing in the ADMS paper came from a
+slightly more optimized version than this one. 
 
 
 ---------------------------------------------------------------------
@@ -88,6 +88,14 @@ MISC NOTES ON THE CODE
   operates alongs the coordinates independently (eg, any L_p metric),
   but more complex metrics will require some aditional work.  The L_2
   metric (standard Euclidean distance) is already defined in defs.h.  
+
+* The k-NN code is currently hard-coded for K=32.  The k-nn code
+  contains a manual implementation of a sorting network, which is why
+  this is hard-coded.  This design allows all sorting to take place
+  in on-chip (shared) memory, and is highly efficient.  Note that
+  the NNs are returned in sorted order, so that if one wants only,
+  say, 5 NNs, one can simply ignore the last 27 returned indices.  For
+  k>32, contact the author.
 
 * The code requires that the entire DB and query set fit into the 
   device memory.  

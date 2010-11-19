@@ -66,7 +66,8 @@ void queryRBC(const matrix q, const rbcStruct rbcS, unint *NNs){
   free(groupCountQ);
 }
 
-
+//This function is very similar to queryRBC, with a couple of basic changes to handle
+//k-nn.  
 void kqueryRBC(const matrix q, const rbcStruct rbcS, intMatrix NNs){
   unint m = q.r;
   unint numReps = rbcS.dr.r;
@@ -99,6 +100,9 @@ void kqueryRBC(const matrix q, const rbcStruct rbcS, intMatrix NNs){
   // Setup the computation matrix.  Currently, the computation matrix is 
   // just the identity matrix: each query assigned to a particular 
   // representative is compared only to that representative's points.  
+
+  // NOTE: currently, idIntersection is the *only* computation matrix 
+  // that will work properly with k-nn search (this is not true for 1-nn above).
   idIntersection(cM);
 
   initCompPlan(&dcP, cM, groupCountQ, rbcS.groupCount, numReps);
@@ -119,7 +123,6 @@ void kqueryRBC(const matrix q, const rbcStruct rbcS, intMatrix NNs){
 
 
 void buildRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
-  //const matrix dr, intMatrix xmap, unint *counts, unint s){
   unint n = x.pr;
   intMatrix xmap;
 
@@ -335,7 +338,6 @@ void computeKNNs(matrix dx, intMatrix dxMap, matrix dq, unint *dqMap, compPlan d
   planKNNWrap(dq, dqMap, dx, dxMap, dMins, dMinIDs, dcP, compLength);
   cudaMemcpy( NNs.mat, dMinIDs.mat, dq.r*K*sizeof(*NNs.mat), cudaMemcpyDeviceToHost);
 
-  
   cudaFree(dMins.mat);
   cudaFree(dMinIDs.mat);
 }
