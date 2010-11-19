@@ -1,8 +1,8 @@
 CC=gcc
 NVCC=nvcc
 CCFLAGS=
-NVCCFLAGS= --ptxas-options=-v
-#other flags: -deviceemu -arch=sm_20 --compiler-bindir=/usr/bin/gcc-4.3
+NVCCFLAGS= 
+#other flags: -deviceemu -arch=sm_20 --ptxas-options=-v
 #These are useful when debugging sometimes.  
 LINKFLAGS=-lcuda  -lm
 #other linkflags: -lgsl -lgslcblas 
