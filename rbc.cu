@@ -136,6 +136,7 @@ void buildRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
   
   //Figure out how much fits into memory
   unint memFree, memTot;
+  //size_t memFree, memTot;
   cuMemGetInfo(&memFree, &memTot);
   memFree = (unint)(((float)memFree)*MEM_USABLE);
   /* mem needed per rep:

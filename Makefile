@@ -1,7 +1,7 @@
 CC=gcc
 NVCC=nvcc
 CCFLAGS=
-NVCCFLAGS= 
+NVCCFLAGS= -DCUDA_FORCE_API_VERSION=3010
 #other flags: -deviceemu -arch=sm_20 --ptxas-options=-v
 #These are useful when debugging sometimes.  
 LINKFLAGS=-lcuda  -lm

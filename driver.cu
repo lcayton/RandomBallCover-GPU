@@ -39,7 +39,7 @@ int main(int argc, char**argv){
   printf("*****************\n");
   
   parseInput(argc,argv);
-
+  
   cuInit(0);
   printf("Using GPU #%d\n",deviceNum);
   if(cudaSetDevice(deviceNum) != cudaSuccess){
