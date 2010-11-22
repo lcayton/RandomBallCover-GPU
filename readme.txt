@@ -138,7 +138,7 @@ followed by another make.
   NVIDIA Tesla c2050.
 
 * This sotware has been tested under the following software setup:
-  Ubuntu 9.10 (linux)
+  Ubuntu 10.04 (linux)
   gcc 4.4
   cuda 3.1
 
@@ -153,4 +153,9 @@ followed by another make.
   CTRL-ALT-F1 does the trick) and running the code directly from the
   terminal.
 
-
+* If you have a graphics card with more than 4GB of memory (eg a Tesla
+  2070), and use a recent version of CUDA (at least 3.2), then an
+  optimization is possible.  In particular, removing the 
+  -DCUDA_FORCE_API_VERSION=3010	
+  flag and making some very minor code adjustments will enhance the
+  build performance. 
