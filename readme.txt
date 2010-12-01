@@ -89,13 +89,12 @@ MISC NOTES ON THE CODE
   but more complex metrics will require some aditional work.  The L_2
   metric (standard Euclidean distance) is already defined in defs.h.  
 
-* The k-NN code is currently hard-coded for K=32.  The k-nn code
-  contains a manual implementation of a sorting network, which is why
-  this is hard-coded.  This design allows all sorting to take place
-  in on-chip (shared) memory, and is highly efficient.  Note that
-  the NNs are returned in sorted order, so that if one wants only,
-  say, 5 NNs, one can simply ignore the last 27 returned indices.  For
-  k>32, contact the author.
+* The k-NN code is currently hard-coded for k=32.  It is hard-coded
+  because it uses a manually implemented sorting network. This design
+  allows all sorting to take place in on-chip (shared) memory, and is
+  highly efficient.  Note that the NNs are returned in sorted order,
+  so that if one wants only, say, 5 NNs, one can simply ignore the
+  last 27 returned indices.  For k>32, contact the author.
 
 * The code requires that the entire DB and query set fit into the 
   device memory.  
