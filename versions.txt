@@ -1,3 +1,6 @@
+0.2.1 dec 2010
+    Bug fix and cuda 3.2 compatability update.    
+
 0.2 nov 2010
     Added support for k-NN queries, for k <= 32.  
 
