@@ -151,10 +151,3 @@ followed by another make.
   You can get around this in Linux by switching out of X-Windows (often 
   CTRL-ALT-F1 does the trick) and running the code directly from the
   terminal.
-
-* If you have a graphics card with more than 4GB of memory (eg a Tesla
-  2070), and use a recent version of CUDA (at least 3.2), then an
-  optimization is possible.  In particular, removing the 
-  -DCUDA_FORCE_API_VERSION=3010	
-  flag and making some very minor code adjustments will enhance the
-  build performance. 

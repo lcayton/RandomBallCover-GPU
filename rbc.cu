@@ -135,9 +135,8 @@ void buildRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
   rbcS->groupCount = (uint*)calloc( PAD(numReps), sizeof(*rbcS->groupCount) );
   
   //Figure out how much fits into memory
-  unint memFree, memTot;
-  //size_t memFree, memTot;
-  cuMemGetInfo(&memFree, &memTot);
+  size_t memFree, memTot;
+  cudaMemGetInfo(&memFree, &memTot);
   memFree = (unint)(((float)memFree)*MEM_USABLE);
   /* mem needed per rep:
    *  n*sizeof(real) - dist mat
@@ -149,7 +148,7 @@ void buildRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
    */
   unint ptsAtOnce = DPAD(memFree/((n+1)*sizeof(real) + n*sizeof(char) + (n+1)*sizeof(unint) + 2*MEM_USED_IN_SCAN(n)));
   if(!ptsAtOnce){
-    fprintf(stderr,"error: %d is not enough memory to build the RBC.. exiting\n", memFree);
+    fprintf(stderr,"error: %lu is not enough memory to build the RBC.. exiting\n", (unsigned long)memFree);
     exit(1);
   }
 

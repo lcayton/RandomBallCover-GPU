@@ -40,21 +40,15 @@ int main(int argc, char**argv){
   
   parseInput(argc,argv);
   
-  cuInit(0);
   printf("Using GPU #%d\n",deviceNum);
   if(cudaSetDevice(deviceNum) != cudaSuccess){
     printf("Unable to select device %d.. exiting. \n",deviceNum);
     exit(1);
   }
   
-  unsigned int memFree, memTot;
-  CUcontext pctx;
-  unsigned int flags=0;
-  int device;
-  cudaGetDevice(&device);
-  cuCtxCreate(&pctx,flags,device);
-  cuMemGetInfo(&memFree, &memTot);
-  printf("GPU memory free = %u/%u (MB) \n",memFree/(1024*1024),memTot/(1024*1024));
+  size_t memFree, memTot;
+  cudaMemGetInfo(&memFree, &memTot);
+  printf("GPU memory free = %lu/%lu (MB) \n",(unsigned long)memFree/(1024*1024),(unsigned long)memTot/(1024*1024));
 
   data  = (real*)calloc( (n+m)*d, sizeof(*data) );
   x.mat = (real*)calloc( PAD(n)*PAD(d), sizeof(*(x.mat)) );
@@ -104,7 +98,9 @@ int main(int argc, char**argv){
   }
   
   evalKNNerror(x,q,kNNsRBC);
-
+  
+  cudaThreadExit();
+  
   free(NNs);
   free(NNsK.mat);
   free(kNNsRBC.mat);
