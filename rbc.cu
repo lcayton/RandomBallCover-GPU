@@ -129,7 +129,7 @@ void buildRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
   setupReps(x, rbcS, numReps);
   copyAndMove(&rbcS->dx, &x);
   
-  xmap.r=numReps; xmap.pr=PAD(numReps); xmap.c=s; xmap.pr=xmap.ld=PAD(s);
+  xmap.r=numReps; xmap.pr=PAD(numReps); xmap.c=s; xmap.pc=xmap.ld=PAD(s);
   xmap.mat = (unint*)calloc( xmap.pr*xmap.pc, sizeof(*xmap.mat) );
   copyAndMoveI(&rbcS->dxMap, &xmap);
   rbcS->groupCount = (uint*)calloc( PAD(numReps), sizeof(*rbcS->groupCount) );
