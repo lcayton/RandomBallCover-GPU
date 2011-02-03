@@ -2,6 +2,7 @@
 #define DEFS_H
 
 #include<float.h>
+#include<stdint.h>
 
 #define FLOAT_TOL 1e-7
 
@@ -49,7 +50,7 @@ typedef float real;
 #define MINi(i,j,k,l) ((i) <= (j) ? (k) : (l))
 
 
-typedef unsigned int unint;
+typedef uint32_t unint;
 
 
 typedef struct {
