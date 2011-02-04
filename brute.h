@@ -10,6 +10,6 @@
 void bruteRangeCount(matrix,matrix,real*,unint*);
 void bruteSearch(matrix,matrix,unint*);
 void bruteCPU(matrix,matrix,unint*);
-void bruteK(matrix,matrix,intMatrix);
+void bruteK(matrix,matrix,intMatrix,matrix);
 //void bruteKCPU(matrix,matrix,intMatrix);
 #endif
