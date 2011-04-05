@@ -58,6 +58,7 @@ void queryRBC(const matrix q, const rbcStruct rbcS, unint *NNs, real* NNdists){
   computeNNs(rbcS.dx, rbcS.dxMap, dq, dqMap, dcP, NNs, NNdists, compLength);
   
   free(qMap);
+  cudaFree(dqMap);
   freeCompPlan(&dcP);
   cudaFree(dq.mat);
   free(cM.mat);
