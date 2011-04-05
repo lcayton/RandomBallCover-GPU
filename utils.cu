@@ -145,6 +145,41 @@ void copyMat(matrix *x, matrix *y){
 }
 
 
+void initMat(matrix *x, unint r, unint c){
+  x->r = r;
+  x->c = c;
+  x->pr = PAD(r);
+  x->pc = PAD(c);
+  x->ld = PAD(c);
+}
+
+
+void initIntMat(intMatrix *x, unint r, unint c){
+  x->r = r;
+  x->c = c;
+  x->pr = PAD(r);
+  x->pc = PAD(c);
+  x->ld = PAD(c);
+}
+
+// returns the size of a matrix in bytes
+size_t sizeOfMatB(matrix x){
+  return x.pr*x.pc*sizeof(*x.mat);
+}
+
+size_t sizeOfIntMatB(intMatrix x){
+  return x.pr*x.pc*sizeof(*x.mat);
+}
+// returns the numbers of elements in a matrix
+size_t sizeOfMat(matrix x){
+  return x.pr*x.pc;
+}
+
+size_t sizeOfIntMat(intMatrix x){
+  return x.pr*x.pc;
+}
+
+
 real distVec(matrix x, matrix y, unint k, unint l){
   unint i;
   real ans=0;

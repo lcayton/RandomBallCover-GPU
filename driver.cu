@@ -15,20 +15,19 @@
 #include "sKernel.h"
 
 void parseInput(int,char**);
-void readData(char*,unint,unint,real*);
-void readDataText(char*,unint,unint,real*);
-void orgData(real*,unint,unint,matrix,matrix);
+void readData(char*,matrix);
+void readDataText(char*,matrix);
 void evalNNerror(matrix, matrix, unint*);
 void evalKNNerror(matrix,matrix,intMatrix);
 
-char *dataFile, *outFile;
-unint n=0, m=0, d=0, numReps=0, s=0;
+char *dataFileX, *dataFileQ, *outFile;
+char runBrute=0, runEval=0;
+unint n=0, m=0, d=0, numReps=0;
 unint deviceNum=0;
 int main(int argc, char**argv){
-  real *data;
   matrix x, q;
-  intMatrix nnsBrute, nnsRBC;
-  matrix distsBrute, distsRBC;
+  intMatrix nnsRBC;
+  matrix distsRBC;
   struct timeval tvB,tvE;
   cudaError_t cE;
   rbcStruct rbcS;
@@ -49,63 +48,63 @@ int main(int argc, char**argv){
   cudaMemGetInfo(&memFree, &memTot);
   printf("GPU memory free = %lu/%lu (MB) \n",(unsigned long)memFree/(1024*1024),(unsigned long)memTot/(1024*1024));
 
-  data  = (real*)calloc( (n+m)*d, sizeof(*data) );
-  x.mat = (real*)calloc( PAD(n)*PAD(d), sizeof(*(x.mat)) );
-
-  //Need to allocate extra space, as each group of q will be padded later.
-  q.mat = (real*)calloc( PAD(m)*PAD(d), sizeof(*(q.mat)) );
-  x.r = n; x.c = d; x.pr = PAD(n); x.pc = PAD(d); x.ld = x.pc;
-  q.r = m; q.c = d; q.pr = PAD(m); q.pc = PAD(d); q.ld = q.pc;
-
+  initMat( &x, n, d );
+  initMat( &q, m, d );
+  x.mat = (real*)calloc( sizeOfMat(x), sizeof(*(x.mat)) );
+  q.mat = (real*)calloc( sizeOfMat(q), sizeof(*(q.mat)) );
+    
   //Load data 
-  readData(dataFile, (n+m), d, data);
-  orgData(data, (n+m), d, x, q);
-  free(data);
+  readData( dataFileX, x );
+  readData( dataFileQ, q );
 
   //Allocate space for NNs and dists
-  nnsBrute.r=q.r; nnsBrute.pr=q.pr; nnsBrute.pc=nnsBrute.c=K; nnsBrute.ld=nnsBrute.pc;
-  nnsBrute.mat = (unint*)calloc(nnsBrute.pr*nnsBrute.pc, sizeof(*nnsBrute.mat));
-  nnsRBC.r=q.r; nnsRBC.pr=q.pr; nnsRBC.pc=nnsRBC.c=K; nnsRBC.ld=nnsRBC.pc;
-  nnsRBC.mat = (unint*)calloc(nnsRBC.pr*nnsRBC.pc, sizeof(*nnsRBC.mat));
-  
-  distsBrute.r=q.r; distsBrute.pr=q.pr; distsBrute.pc=distsBrute.c=K; distsBrute.ld=distsBrute.pc;
-  distsBrute.mat = (real*)calloc(distsBrute.pr*distsBrute.pc, sizeof(*distsBrute.mat));
-  distsRBC.r=q.r; distsRBC.pr=q.pr; distsRBC.pc=distsRBC.c=K; distsRBC.ld=distsRBC.pc;
-  distsRBC.mat = (real*)calloc(distsRBC.pr*distsRBC.pc, sizeof(*distsRBC.mat));
-
-  printf("running k-brute force..\n");
-  gettimeofday(&tvB,NULL);
-  bruteK(x,q,nnsBrute,distsBrute);
-  gettimeofday(&tvE,NULL);
-  printf("\t.. time elapsed = %6.4f \n",timeDiff(tvB,tvE));
+  initIntMat( &nnsRBC, m, K );
+  initMat( &distsRBC, m, K );
+  nnsRBC.mat = (unint*)calloc( sizeOfIntMat(nnsRBC), sizeof(*nnsRBC.mat) );
+  distsRBC.mat = (real*)calloc( sizeOfMat(distsRBC), sizeof(*distsRBC.mat) );
 
   printf("\nrunning rbc..\n");
+  //Build the RBC
   gettimeofday(&tvB,NULL);
-  buildRBC(x, &rbcS, numReps, s);
+  buildRBC(x, &rbcS, numReps, numReps);
   gettimeofday(&tvE,NULL);
   printf("\t.. build time for rbc = %6.4f \n",timeDiff(tvB,tvE));
-
-  //This finds the 32-NN; if you are only interested in the 1-NN, use queryRBC(..) instead
+  
+  //This finds the 32-NNs; if you are only interested in the 1-NN, use queryRBC(..) instead
   gettimeofday(&tvB,NULL);
   kqueryRBC(q, rbcS, nnsRBC, distsRBC);
   gettimeofday(&tvE,NULL);
   printf("\t.. query time for krbc = %6.4f \n",timeDiff(tvB,tvE));
   
-  destroyRBC(&rbcS);
-  printf("finished \n");
-  
+  if( runBrute ){
+    intMatrix nnsBrute;
+    matrix distsBrute;
+    initIntMat( &nnsBrute, m, K );
+    nnsBrute.mat = (unint*)calloc( sizeOfIntMat(nnsBrute), sizeof(*nnsBrute.mat) );
+    initMat( &distsBrute, m, K );
+    distsBrute.mat = (real*)calloc( sizeOfMat(distsBrute), sizeof(*distsBrute.mat) );
+    
+    printf("running k-brute force..\n");
+    gettimeofday(&tvB,NULL);
+    bruteK(x,q,nnsBrute,distsBrute);
+    gettimeofday(&tvE,NULL);
+    printf("\t.. time elapsed = %6.4f \n",timeDiff(tvB,tvE));
+    
+    free(nnsBrute.mat);
+    free(distsBrute.mat);
+  }
+
   cE = cudaGetLastError();
   if( cE != cudaSuccess ){
     printf("Execution failed; error type: %s \n", cudaGetErrorString(cE) );
   }
   
-  evalKNNerror(x,q,nnsRBC);
+  if( runEval )
+    evalKNNerror(x,q,nnsRBC);
   
+  destroyRBC(&rbcS);
   cudaThreadExit();
-  
-  free(nnsBrute.mat);
   free(nnsRBC.mat);
-  free(distsBrute.mat);
   free(distsRBC.mat);
   free(x.mat);
   free(q.mat);
@@ -115,22 +114,26 @@ int main(int argc, char**argv){
 void parseInput(int argc, char **argv){
   int i=1;
   if(argc <= 1){
-    printf("\nusage: \n  testRBC -f datafile (bin) -n numPts (DB) -m numQueries -d dim -r numReps -s numPtsPerRep [-o outFile] [-g GPU num]\n\n");
-    printf("\tdatafile     = binary file containing the data\n");
+    printf("\nusage: \n  testRBC -x datafileX -q datafileQ  -n numPts (DB) -m numQueries -d dim -r numReps [-o outFile] [-g GPU num] [-b] [-e]\n\n");
+    printf("\tdatafileX    = binary file containing the database\n");
+    printf("\tdatafileQ    = binary file containing the queries\n");
     printf("\tnumPts       = size of database\n");
     printf("\tnumQueries   = number of queries\n");
     printf("\tdim          = dimensionailty\n");
     printf("\tnumReps      = number of representatives\n");
-    printf("\tnumPtsPerRep = number of points assigned to each representative\n");
     printf("\toutFile      = output file (optional); stored in text format\n");
     printf("\tGPU num      = ID # of the GPU to use (optional) for multi-GPU machines\n");
+    printf("\n\tuse -b to run brute force in addition the RBC\n");
+    printf("\tuse -e option to run evaluation routine\n");
     printf("\n\n");
     exit(0);
   }
   
   while(i<argc){
-    if(!strcmp(argv[i], "-f"))
-      dataFile = argv[++i];
+    if(!strcmp(argv[i], "-x"))
+      dataFileX = argv[++i];
+    else if(!strcmp(argv[i], "-q"))
+      dataFileQ = argv[++i];
     else if(!strcmp(argv[i], "-n"))
       n = atoi(argv[++i]);
     else if(!strcmp(argv[i], "-m"))
@@ -139,8 +142,6 @@ void parseInput(int argc, char **argv){
       d = atoi(argv[++i]);
     else if(!strcmp(argv[i], "-r"))
       numReps = atoi(argv[++i]);
-    else if(!strcmp(argv[i], "-s"))
-      s = atoi(argv[++i]);
     else if(!strcmp(argv[i], "-o"))
       outFile = argv[++i];
     else if(!strcmp(argv[i], "-g"))
@@ -152,7 +153,7 @@ void parseInput(int argc, char **argv){
     i++;
   }
 
-  if( !n || !m || !d || !numReps || !s || !dataFile){
+  if( !n || !m || !d || !numReps || !dataFileX || !dataFileQ ){
     fprintf(stderr,"more arguments needed.. exiting\n");
     exit(1);
   }
@@ -164,7 +165,8 @@ void parseInput(int argc, char **argv){
 }
 
 
-void readData(char *dataFile, unint rows, unint cols, real *data){
+void readData(char *dataFile, matrix x){
+  unint i;
   FILE *fp;
   unint numRead;
 
@@ -174,18 +176,22 @@ void readData(char *dataFile, unint rows, unint cols, real *data){
     exit(1);
   }
     
-  numRead = fread(data,sizeof(real),rows*cols,fp);
-  if(numRead != rows*cols){
-    fprintf(stderr,"error reading file.. exiting \n");
-    exit(1);
+  for( i=0; i<x.r; i++ ){ //can't load everything in one fread
+                           //because matrix is padded.
+    numRead = fread( &x.mat[IDX( i, 0, x.ld )], sizeof(real), x.c, fp );
+    if(numRead != x.c){
+      fprintf(stderr,"error reading file.. exiting \n");
+      exit(1);
+    }
   }
   fclose(fp);
 }
 
 
-void readDataText(char *dataFile, unint rows, unint cols, real *data){
+void readDataText(char *dataFile, matrix x){
   FILE *fp;
   real t;
+  int i,j;
 
   fp = fopen(dataFile,"r");
   if(fp==NULL){
@@ -193,43 +199,16 @@ void readDataText(char *dataFile, unint rows, unint cols, real *data){
     exit(1);
   }
     
-  for(int i=0; i<rows; i++){
-    for(int j=0; j<cols; j++){
+  for(i=0; i<x.r; i++){
+    for(j=0; j<x.c; j++){
       if(fscanf(fp,"%f ", &t)==EOF){
 	fprintf(stderr,"error reading file.. exiting \n");
 	exit(1);
       }
-      data[IDX( i, j, cols )]=(real)t;
+      x.mat[IDX( i, j, x.ld )]=(real)t;
     }
   }
   fclose(fp);
-}
-
-//This function splits the data into two matrices, x and q, of 
-//their specified dimensions.  The data is split randomly.
-//It is assumed that the number of rows of data (the parameter n)
-//is at least as large as x.r+q.r
-void orgData(real *data, unint n, unint d, matrix x, matrix q){
-   
-  unint i,fi,j;
-  unint *p;
-  p = (unint*)calloc(n,sizeof(*p));
-  
-  randPerm(n,p);
-
-  for(i=0,fi=0 ; i<x.r ; i++,fi++){
-    for(j=0;j<x.c;j++){
-      x.mat[IDX(i,j,x.ld)] = data[IDX(p[fi],j,d)];
-    }
-  }
-
-  for(i=0 ; i<q.r ; i++,fi++){
-    for(j=0;j<q.c;j++){
-      q.mat[IDX(i,j,q.ld)] = data[IDX(p[fi],j,d)];
-    } 
-  }
-
-  free(p);
 }
 
 
@@ -264,7 +243,7 @@ void evalNNerror(matrix x, matrix q, unint *NNs){
   
   if(outFile){
     FILE* fp = fopen(outFile, "a");
-    fprintf( fp, "%d %d %6.5f %6.5f \n", numReps, s, mean, sqrt(var) );
+    fprintf( fp, "%d %6.5f %6.5f \n", numReps, mean, sqrt(var) );
     fclose(fp);
   }
 
@@ -318,7 +297,7 @@ void evalKNNerror(matrix x, matrix q, intMatrix NNs){
   FILE* fp;
   if(outFile){
     fp = fopen(outFile, "a");
-    fprintf( fp, "%d %d %6.5f %6.5f ", numReps, s, mean, sqrt(var) );
+    fprintf( fp, "%d %6.5f %6.5f ", numReps, mean, sqrt(var) );
   }
 
   real *ranges = (real*)calloc(q.pr,sizeof(*ranges));

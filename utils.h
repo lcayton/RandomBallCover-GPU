@@ -20,4 +20,10 @@ void copyVector(real*,real*,unint);
 real distVec(matrix,matrix,unint,unint);
 double timeDiff(struct timeval,struct timeval);
 void copyMat(matrix*,matrix*);
+void initMat(matrix*,unint,unint);
+void initIntMat(intMatrix*,unint,unint);
+size_t sizeOfMatB(matrix);
+size_t sizeOfIntMatB(intMatrix);
+size_t sizeOfMat(matrix);
+size_t sizeOfIntMat(intMatrix);
 #endif

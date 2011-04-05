@@ -1,6 +1,6 @@
 CC=gcc
 NVCC=nvcc
-CCFLAGS=
+CCFLAGS=-O3
 NVCCFLAGS=
 #other flags: -deviceemu -arch=sm_20 --ptxas-options=-v
 #These are useful when debugging sometimes.  
