@@ -421,6 +421,11 @@ void initCompPlan(compPlan *dcP, charMatrix cM, unint *groupCountQ, unint *group
   checkErr( cudaMalloc( (void**)&dcP->qGroupToXGroup, sQGroupToXGroup*sizeof(*dcP->qGroupToXGroup) ) );
   cudaMemcpy( dcP->qGroupToXGroup, cP.qGroupToXGroup, sQGroupToXGroup*sizeof(*dcP->qGroupToXGroup), cudaMemcpyHostToDevice );
   dcP->ld = cP.ld;
+
+  free(cP.numGroups);
+  free(cP.groupCountX);
+  free(cP.qToQGroup);
+  free(cP.qGroupToXGroup);
 }
 
 
