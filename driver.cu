@@ -19,11 +19,12 @@ void readData(char*,matrix);
 void readDataText(char*,matrix);
 void evalNNerror(matrix, matrix, unint*);
 void evalKNNerror(matrix,matrix,intMatrix);
+void writeNeighbs(char*,char*,intMatrix,matrix);
 
-char *dataFileX, *dataFileQ, *outFile;
+char *dataFileX, *dataFileQ, *dataFileXtxt, *dataFileQtxt, *outFile, *outFiletxt;
 char runBrute=0, runEval=0;
-unint n=0, m=0, d=0, numReps=0;
-unint deviceNum=0;
+unint n=0, m=0, d=0, numReps=0, deviceNum=0;
+
 int main(int argc, char**argv){
   matrix x, q;
   intMatrix nnsRBC;
@@ -38,6 +39,7 @@ int main(int argc, char**argv){
   
   parseInput(argc,argv);
   
+  gettimeofday( &tvB, NULL );
   printf("Using GPU #%d\n",deviceNum);
   if(cudaSetDevice(deviceNum) != cudaSuccess){
     printf("Unable to select device %d.. exiting. \n",deviceNum);
@@ -47,28 +49,37 @@ int main(int argc, char**argv){
   size_t memFree, memTot;
   cudaMemGetInfo(&memFree, &memTot);
   printf("GPU memory free = %lu/%lu (MB) \n",(unsigned long)memFree/(1024*1024),(unsigned long)memTot/(1024*1024));
-
+  gettimeofday( &tvE, NULL );
+  printf(" init time: %6.2f \n", timeDiff( tvB, tvE ) );
+  
   initMat( &x, n, d );
   initMat( &q, m, d );
   x.mat = (real*)calloc( sizeOfMat(x), sizeof(*(x.mat)) );
   q.mat = (real*)calloc( sizeOfMat(q), sizeof(*(q.mat)) );
     
   //Load data 
-  readData( dataFileX, x );
-  readData( dataFileQ, q );
+  if(dataFileXtxt)
+    readDataText(dataFileXtxt, x);
+  else
+    readData(dataFileX, x);
+  if(dataFileQtxt)
+    readDataText(dataFileQtxt, q);
+  else
+    readData(dataFileQ, q);
+
 
   //Allocate space for NNs and dists
-  initIntMat( &nnsRBC, m, K );
+  initIntMat( &nnsRBC, m, K );  //K is defined in defs.h
   initMat( &distsRBC, m, K );
   nnsRBC.mat = (unint*)calloc( sizeOfIntMat(nnsRBC), sizeof(*nnsRBC.mat) );
   distsRBC.mat = (real*)calloc( sizeOfMat(distsRBC), sizeof(*distsRBC.mat) );
 
-  printf("\nrunning rbc..\n");
   //Build the RBC
+  printf("building the rbc..\n");
   gettimeofday(&tvB,NULL);
   buildRBC(x, &rbcS, numReps, numReps);
   gettimeofday(&tvE,NULL);
-  printf("\t.. build time for rbc = %6.4f \n",timeDiff(tvB,tvE));
+  printf("\t.. build time = %6.4f \n",timeDiff(tvB,tvE));
   
   //This finds the 32-NNs; if you are only interested in the 1-NN, use queryRBC(..) instead
   gettimeofday(&tvB,NULL);
@@ -102,6 +113,9 @@ int main(int argc, char**argv){
   if( runEval )
     evalKNNerror(x,q,nnsRBC);
   
+  if( outFile || outFiletxt )
+    writeNeighbs( outFile, outFiletxt, nnsRBC, distsRBC );
+
   destroyRBC(&rbcS);
   cudaThreadExit();
   free(nnsRBC.mat);
@@ -119,12 +133,13 @@ void parseInput(int argc, char **argv){
     printf("\tdatafileQ    = binary file containing the queries\n");
     printf("\tnumPts       = size of database\n");
     printf("\tnumQueries   = number of queries\n");
-    printf("\tdim          = dimensionailty\n");
+    printf("\tdim          = dimensionality\n");
     printf("\tnumReps      = number of representatives\n");
-    printf("\toutFile      = output file (optional); stored in text format\n");
+    printf("\toutFile      = binary output file (optional)\n");
     printf("\tGPU num      = ID # of the GPU to use (optional) for multi-GPU machines\n");
     printf("\n\tuse -b to run brute force in addition the RBC\n");
-    printf("\tuse -e option to run evaluation routine\n");
+    printf("\tuse -e to run the evaluation routine (implicitly runs brute force)\n");
+    printf("\n\n\tTo input/output data in text format (instead of bin), use the \n\t-X and -Q and -O switches in place of -x and -q and -o (respectively).\n");
     printf("\n\n");
     exit(0);
   }
@@ -133,6 +148,10 @@ void parseInput(int argc, char **argv){
     if(!strcmp(argv[i], "-x"))
       dataFileX = argv[++i];
     else if(!strcmp(argv[i], "-q"))
+      dataFileQ = argv[++i];
+    else if(!strcmp(argv[i], "-X"))
+      dataFileX = argv[++i];
+    else if(!strcmp(argv[i], "-Q"))
       dataFileQ = argv[++i];
     else if(!strcmp(argv[i], "-n"))
       n = atoi(argv[++i]);
@@ -144,8 +163,14 @@ void parseInput(int argc, char **argv){
       numReps = atoi(argv[++i]);
     else if(!strcmp(argv[i], "-o"))
       outFile = argv[++i];
+    else if(!strcmp(argv[i], "-O"))
+      outFiletxt = argv[++i];
     else if(!strcmp(argv[i], "-g"))
       deviceNum = atoi(argv[++i]);
+    else if(!strcmp(argv[i], "-b"))
+      runBrute=1;
+    else if(!strcmp(argv[i], "-e"))
+      runEval=1;
     else{
       fprintf(stderr,"%s : unrecognized option.. exiting\n",argv[i]);
       exit(1);
@@ -153,11 +178,18 @@ void parseInput(int argc, char **argv){
     i++;
   }
 
-  if( !n || !m || !d || !numReps || !dataFileX || !dataFileQ ){
+  if( !n || !m || !d || !numReps  ){
     fprintf(stderr,"more arguments needed.. exiting\n");
     exit(1);
   }
-  
+  if( (!dataFileX && !dataFileXtxt) || (!dataFileQ && !dataFileQtxt) ){
+    fprintf(stderr,"more arguments needed.. exiting\n");
+    exit(1);
+  }
+  if( (dataFileX && dataFileXtxt) || (dataFileQ && dataFileQtxt) ){
+    fprintf(stderr,"you can only give one database file and one query file.. exiting\n");
+    exit(1); 
+  }
   if(numReps>n){
     fprintf(stderr,"can't have more representatives than points.. exiting\n");
     exit(1);
@@ -329,4 +361,48 @@ void evalKNNerror(matrix x, matrix q, intMatrix NNs){
   free(ol);
   free(NNsB.mat);
   free(distsBrute.mat);
+}
+
+
+void writeNeighbs(char *file, char *filetxt, intMatrix NNs, matrix dNNs){
+  unint i,j;
+  
+  if( filetxt ) { //write text
+
+    FILE *fp = fopen(filetxt,"w");
+    if( !fp ){
+      fprintf(stderr, "can't open output file\n");
+      return;
+    }
+    
+    for( i=0; i<m; i++ ){
+      for( j=0; j<K; j++ )
+	fprintf( fp, "%u ", NNs.mat[IDX( i, j, NNs.ld )] );
+      fprintf(fp, "\n");
+    }
+    
+    for( i=0; i<m; i++ ){
+      for( j=0; j<K; j++ )
+	fprintf( fp, "%f ", dNNs.mat[IDX( i, j, dNNs.ld )]); 
+      fprintf(fp, "\n");
+    }
+    fclose(fp);
+    
+  }
+
+  if( file ){ //write binary
+
+    FILE *fp = fopen(file,"wb");
+    if( !fp ){
+      fprintf(stderr, "can't open output file\n");
+      return;
+    }
+    
+    for( i=0; i<m; i++ )
+      fwrite( &NNs.mat[IDX( i, 0, NNs.ld )], sizeof(*NNs.mat), K, fp );
+    for( i=0; i<m; i++ )
+      fwrite( &dNNs.mat[IDX( i, 0, dNNs.ld )], sizeof(*dNNs.mat), K, fp );
+    
+    fclose(fp);
+  }
 }

@@ -26,6 +26,9 @@ structure for nearest neighbor search described in
 L. Cayton, A nearest neighbor data structure for graphics hardware.
 ADMS, 2010.
 
+L. Cayton, Accelerating nearest neighbor search on manycore systems.
+Submitted. 
+
 
 ---------------------------------------------------------------------
 FILES
