@@ -21,13 +21,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 SUMMARY
 
 This is a C and CUDA implementation of the Random Ball Cover data 
-structure for nearest neighbor search described in 
+structure for fast nearest neighbor search on a GPU.  The code
+implements the one-shot algorithm.
 
-L. Cayton, A nearest neighbor data structure for graphics hardware.
+See the following papers for a detailed description of the search
+algorithm and the theory behind it.
+
+* L. Cayton, A nearest neighbor data structure for graphics hardware.
 ADMS, 2010.
-
-L. Cayton, Accelerating nearest neighbor search on manycore systems.
+* L. Cayton, Accelerating nearest neighbor search on manycore systems.
 Submitted. 
+
+
+---------------------------------------------------------------------
+COMPILATION
+
+Type make in a shell.  Requires GCC and NVCC (CUDA).  The code has
+been developed under GCC 4.4 and CUDA 3.1.
+
+
+---------------------------------------------------------------------
+USE
+
+A sample driver is provided for the RBC.  To try it out, type
+$ testRBC
+at the prompt and a list of options will be displayed.
+
+The output file format is a list of the queries' NNs,
+followed by a list of the distances to those NNs.  Note that by
+default, all input and output is stored in single-precision (float)
+format.  
+
+Basic functionality is provided through this driver, but I recommend
+integrating the RBC code directly into your code for the best
+results.  In particular, the best way to use the current
+implementation is to build the RBC once, then query it many times.
+
+The method requires a single parameter, the number of
+representatives.  This parameter allows one to trade-off between
+search quality and search speed.  The best way to set this parameter
+is to try a few different values out; a good starting point is
+generally 5*sqrt(n), where n is the number of database points.  Use
+the eval option (-e) to print out the error rate.  See the paper for
+detailed information on this parameter. 
 
 
 ---------------------------------------------------------------------
@@ -51,38 +87,6 @@ FILES
 
 
 ---------------------------------------------------------------------
-COMPILATION
-
-Type make in a shell.  Requires GCC and NVCC (CUDA).  The code has
-been tested under GCC 4.4 and CUDA 3.1.
-
-
----------------------------------------------------------------------
-USE
-
-To use the RBC data structure, you will likely need to integrate this
-code into your own.  The driver.cu file provides an example of how to
-use the RBC implementation.  To try it out, type
->testRBC
-at the prompt and a list of options will be displayed.  Currently, the
-test program assumes that the input is a single binary file, which it
-then splits into queries and a the database randomly.  Clearly, such a
-setup is only useful for testing the performance of the data
-structure.  To use the data structure in a more useful fashion, you
-may wish to call the readData function on separate files.  There is
-also a readDataText function in the driver.cu for your convenience.  
-
-The core of the implementation is in rbc.cu and in the kernel files.
-There is a buildRBC function, a queryRBC function, and a kqueryRBC
-function, which together should suffice for basic use of the data
-structure.   
-
-Currently, the kernel functions are reasonably optimized, but can be
-improved.  Indeed, the results appearing in the ADMS paper came from a
-slightly more optimized version than this one. 
-
-
----------------------------------------------------------------------
 MISC NOTES ON THE CODE
 
 * The code currently computes distance using the L_1 (manhattan)
@@ -101,21 +105,6 @@ MISC NOTES ON THE CODE
 
 * The code requires that the entire DB and query set fit into the 
   device memory.  
-
-* For the most part, device variables (ie arrays residing on the GPU)
-  begin with a lowercase d.  For example, the device version of the 
-  DB variable x is dx.  
-
-* The computePlan code is a bit more complex than is needed for the 
-  version of the RBC search algorithm described in the paper.  The 
-  search algorithm described in the paper has two steps: (1) Find the 
-  closest representative to the query.  (2) Explore the points owned
-  by that representative (ie the s-closest points to the representative
-  in the DB).  The computePlan code is more complex to make it easy
-  to try out other options.  For example, one could search the points
-  owned by the *two* closest representatives to the query instead.  This
-  would require only minor changes to the code, though is currently 
-  untested.
 
 * Currently the software works in single precision.  If you wish to 
   switch to double precision, you must edit the defs.h file.  Simply 
@@ -136,7 +125,7 @@ make clean
 followed by another make.
 
 * This software has been tested on the following graphics cards:
-  NVIDIA GTX 285
+  NVIDIA GTX 285, GT 430, GTX 480
   NVIDIA Tesla c2050.
 
 * This sotware has been tested under the following software setup:
@@ -144,8 +133,23 @@ followed by another make.
   gcc 4.4
   cuda 3.1
 
-  Please share your experience getting it to work under Windows and
-  Mac OSX!
+  It has been reported to work under Mac OSX.  Please share your
+  experience getting it to work under Windows!
+ 
+* For the most part, device variables (ie arrays residing on the GPU)
+  begin with a lowercase d.  For example, the device version of the 
+  DB variable x is dx.  
+
+* The computePlan code is a bit more complex than is needed for the 
+  version of the RBC search algorithm described in the paper.  The 
+  search algorithm described in the paper has two steps: (1) Find the 
+  closest representative to the query.  (2) Explore the points owned
+  by that representative (ie the s-closest points to the representative
+  in the DB).  The computePlan code is more complex to make it easy
+  to try out other options.  For example, one could search the points
+  owned by the *two* closest representatives to the query instead.  This
+  would require only minor changes to the code, though is currently 
+  untested.
 
 * If you are running this code on a GPU which is also driving your
   display: A well-known issue with CUDA code in this situation is that 
