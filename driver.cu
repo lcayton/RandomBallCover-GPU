@@ -52,20 +52,22 @@ int main(int argc, char**argv){
   gettimeofday( &tvE, NULL );
   printf(" init time: %6.2f \n", timeDiff( tvB, tvE ) );
   
+
+  //Setup matrices
   initMat( &x, n, d );
   initMat( &q, m, d );
   x.mat = (real*)calloc( sizeOfMat(x), sizeof(*(x.mat)) );
   q.mat = (real*)calloc( sizeOfMat(q), sizeof(*(q.mat)) );
     
   //Load data 
-  if(dataFileXtxt)
-    readDataText(dataFileXtxt, x);
+  if( dataFileXtxt )
+    readDataText( dataFileXtxt, x );
   else
-    readData(dataFileX, x);
-  if(dataFileQtxt)
-    readDataText(dataFileQtxt, q);
+    readData( dataFileX, x );
+  if( dataFileQtxt )
+    readDataText( dataFileQtxt, q );
   else
-    readData(dataFileQ, q);
+    readData( dataFileQ, q );
 
 
   //Allocate space for NNs and dists
@@ -76,16 +78,16 @@ int main(int argc, char**argv){
 
   //Build the RBC
   printf("building the rbc..\n");
-  gettimeofday(&tvB,NULL);
-  buildRBC(x, &rbcS, numReps, numReps);
-  gettimeofday(&tvE,NULL);
-  printf("\t.. build time = %6.4f \n",timeDiff(tvB,tvE));
+  gettimeofday( &tvB, NULL );
+  buildRBC( x, &rbcS, numReps, numReps );
+  gettimeofday( &tvE, NULL );
+  printf( "\t.. build time = %6.4f \n", timeDiff(tvB,tvE) );
   
   //This finds the 32-NNs; if you are only interested in the 1-NN, use queryRBC(..) instead
-  gettimeofday(&tvB,NULL);
-  kqueryRBC(q, rbcS, nnsRBC, distsRBC);
-  gettimeofday(&tvE,NULL);
-  printf("\t.. query time for krbc = %6.4f \n",timeDiff(tvB,tvE));
+  gettimeofday( &tvB, NULL );
+  kqueryRBC( q, rbcS, nnsRBC, distsRBC );
+  gettimeofday( &tvE, NULL );
+  printf( "\t.. query time for krbc = %6.4f \n", timeDiff(tvB,tvE) );
   
   if( runBrute ){
     intMatrix nnsBrute;
@@ -96,13 +98,13 @@ int main(int argc, char**argv){
     distsBrute.mat = (real*)calloc( sizeOfMat(distsBrute), sizeof(*distsBrute.mat) );
     
     printf("running k-brute force..\n");
-    gettimeofday(&tvB,NULL);
-    bruteK(x,q,nnsBrute,distsBrute);
-    gettimeofday(&tvE,NULL);
-    printf("\t.. time elapsed = %6.4f \n",timeDiff(tvB,tvE));
+    gettimeofday( &tvB, NULL );
+    bruteK( x, q, nnsBrute, distsBrute );
+    gettimeofday( &tvE, NULL );
+    printf( "\t.. time elapsed = %6.4f \n", timeDiff(tvB,tvE) );
     
-    free(nnsBrute.mat);
-    free(distsBrute.mat);
+    free( nnsBrute.mat );
+    free( distsBrute.mat );
   }
 
   cE = cudaGetLastError();
@@ -116,12 +118,12 @@ int main(int argc, char**argv){
   if( outFile || outFiletxt )
     writeNeighbs( outFile, outFiletxt, nnsRBC, distsRBC );
 
-  destroyRBC(&rbcS);
+  destroyRBC( &rbcS );
   cudaThreadExit();
-  free(nnsRBC.mat);
-  free(distsRBC.mat);
-  free(x.mat);
-  free(q.mat);
+  free( nnsRBC.mat );
+  free( distsRBC.mat );
+  free( x.mat );
+  free( q.mat );
 }
 
 

@@ -1,18 +1,14 @@
 CC=gcc
 NVCC=nvcc
-CCFLAGS=-O3
-NVCCFLAGS=
-#other flags: -deviceemu -arch=sm_20 --ptxas-options=-v
-#These are useful when debugging sometimes.  
-LINKFLAGS=-lcuda  -lm
-#other linkflags: -lgsl -lgslcblas 
-# lgsl and lgslcblas are required if you want to use the GSL. 
-SOURCES=
-CUSOURCES= driver.cu utils.cu utilsGPU.cu rbc.cu brute.cu kernels.cu kernelWrap.cu sKernel.cu sKernelWrap.cu
-OBJECTS=$(SOURCES:.c=.o)
+NVCCFLAGS=-O3
+# sometimes useful flags: -arch=sm_20 --ptxas-options=-v -g -G
+# Note that you will need to specify an arch (as above) if you wish to use
+# double precision
+LINKFLAGS=-lcuda -lm
+CUSOURCES=driver.cu utils.cu utilsGPU.cu rbc.cu brute.cu kernels.cu kernelWrap.cu sKernel.cu sKernelWrap.cu
 CUOBJECTS=$(CUSOURCES:.cu=.o)
 EXECUTABLE=testRBC
-all: $(SOURCES) $(CUSOURCES) $(EXECUTABLE)
+all: $(CUSOURCES) $(EXECUTABLE)
 
 $(EXECUTABLE): $(OBJECTS) $(CUOBJECTS)
 	$(NVCC) $(NVCCFLAGS) $(OBJECTS) $(CUOBJECTS) -o $@ $(LINKFLAGS)

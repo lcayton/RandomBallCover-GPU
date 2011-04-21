@@ -133,7 +133,7 @@ void buildRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
   xmap.r=numReps; xmap.pr=PAD(numReps); xmap.c=s; xmap.pc=xmap.ld=PAD(s);
   xmap.mat = (unint*)calloc( xmap.pr*xmap.pc, sizeof(*xmap.mat) );
   copyAndMoveI(&rbcS->dxMap, &xmap);
-  rbcS->groupCount = (uint*)calloc( PAD(numReps), sizeof(*rbcS->groupCount) );
+  rbcS->groupCount = (unint*)calloc( PAD(numReps), sizeof(*rbcS->groupCount) );
   
   //Figure out how much fits into memory
   size_t memFree, memTot;

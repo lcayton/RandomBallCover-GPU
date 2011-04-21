@@ -1,4 +1,4 @@
-***Random Ball Cover (RBC) v0.2***
+***Random Ball Cover (RBC) v0.2.4***
 Lawrence Cayton
 lcayton@tuebingen.mpg.de
 
@@ -17,6 +17,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+
 ---------------------------------------------------------------------
 SUMMARY
 
@@ -30,7 +31,7 @@ algorithm and the theory behind it.
 * L. Cayton, A nearest neighbor data structure for graphics hardware.
 ADMS, 2010.
 * L. Cayton, Accelerating nearest neighbor search on manycore systems.
-Submitted. 
+Submitted, 2011. 
 
 
 ---------------------------------------------------------------------
@@ -54,16 +55,16 @@ format.
 
 Basic functionality is provided through this driver, but I recommend
 integrating the RBC code directly into your code for the best
-results.  In particular, the best way to use the current
-implementation is to build the RBC once, then query it many times.
+results.  For many applications, the RBC needs to be built only once,
+and then can be queried many times. 
 
 The method requires a single parameter, the number of
-representatives.  This parameter allows one to trade-off between
+representatives.  This parameter allows you to trade-off between
 search quality and search speed.  The best way to set this parameter
 is to try a few different values out; a good starting point is
 generally 5*sqrt(n), where n is the number of database points.  Use
-the eval option (-e) to print out the error rate.  See the paper for
-detailed information on this parameter. 
+the eval option (-e) to print out the error rate.  See the paper
+(Cayton, 2011) for detailed information on this parameter. 
 
 
 ---------------------------------------------------------------------
@@ -119,23 +120,9 @@ typedef float real;
 #define MAX_REAL FLT_MAX
 
 Then, you must do a 
-
-make clean
-
+$ make clean
 followed by another make.
 
-* This software has been tested on the following graphics cards:
-  NVIDIA GTX 285, GT 430, GTX 480
-  NVIDIA Tesla c2050.
-
-* This sotware has been tested under the following software setup:
-  Ubuntu 10.04 (linux)
-  gcc 4.4
-  cuda 3.1
-
-  It has been reported to work under Mac OSX.  Please share your
-  experience getting it to work under Windows!
- 
 * For the most part, device variables (ie arrays residing on the GPU)
   begin with a lowercase d.  For example, the device version of the 
   DB variable x is dx.  
@@ -151,6 +138,17 @@ followed by another make.
   would require only minor changes to the code, though is currently 
   untested.
 
+* This software has been tested on the following graphics cards:
+  NVIDIA GTX 285, GT 430, GTX 480, GeForce 320M, Tesla c2050
+
+* This sotware has been developed under the following software setup:
+  Ubuntu 10.04 (linux)
+  gcc 4.4
+  cuda 3.2
+
+  It has also been tested under Mac OSX.  Please share your
+  experience getting it to work under Windows!
+ 
 * If you are running this code on a GPU which is also driving your
   display: A well-known issue with CUDA code in this situation is that 
   a process within the operating system will automatically kill 
