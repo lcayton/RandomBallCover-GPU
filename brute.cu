@@ -75,8 +75,8 @@ void bruteK(matrix x, matrix q, intMatrix NNs, matrix NNdists){
   
   dx.r=x.r; dx.pr=x.pr; dx.c=x.c; dx.pc=x.pc; dx.ld=x.ld;
   dq.r=q.r; dq.pr=q.pr; dq.c=q.c; dq.pc=q.pc; dq.ld=q.ld;
-  dNNdists.r=q.r; dNNdists.pr=q.pr; dNNdists.c=K; dNNdists.pc=K; dNNdists.ld=dNNdists.pc;
-  dMinIDs.r=q.r; dMinIDs.pr=q.pr; dMinIDs.c=K; dMinIDs.pc=K; dMinIDs.ld=dMinIDs.pc;
+  dNNdists.r=q.r; dNNdists.pr=q.pr; dNNdists.c=KMAX; dNNdists.pc=KMAX; dNNdists.ld=dNNdists.pc;
+  dMinIDs.r=q.r; dMinIDs.pr=q.pr; dMinIDs.c=KMAX; dMinIDs.pc=KMAX; dMinIDs.ld=dMinIDs.pc;
 
   checkErr( cudaMalloc((void**)&dNNdists.mat, dNNdists.pc*dNNdists.pr*sizeof(*dNNdists.mat)) );
   checkErr( cudaMalloc((void**)&dMinIDs.mat, dMinIDs.pc*dMinIDs.pr*sizeof(*dMinIDs.mat)) );
@@ -143,7 +143,7 @@ void bruteCPU(matrix X, matrix Q, unint *NNs){
 /*     for( j=0; j<x.r; j++) */
 /*       d[i][j] = distVec( q, x, i, j ); */
 /*     gsl_sort_float_index(t[i], d[i], 1, x.r); */
-/*     for ( j=0; j<K; j++) */
+/*     for ( j=0; j<KMAX; j++) */
 /*       NNs.mat[IDX( i, j, NNs.ld )] = t[i][j]; */
 /*   } */
 

@@ -40,11 +40,11 @@ int main(int argc, char**argv){
   parseInput(argc,argv);
   
   gettimeofday( &tvB, NULL );
-  printf("Using GPU #%d\n",deviceNum);
-  if(cudaSetDevice(deviceNum) != cudaSuccess){
-    printf("Unable to select device %d.. exiting. \n",deviceNum);
-    exit(1);
-  }
+  printf("Using GPU #%d\n",deviceNum); 
+  if(cudaSetDevice(deviceNum) != cudaSuccess){ 
+    printf("Unable to select device %d.. exiting. \n",deviceNum); 
+    exit(1); 
+  } 
   
   size_t memFree, memTot;
   cudaMemGetInfo(&memFree, &memTot);
@@ -71,8 +71,8 @@ int main(int argc, char**argv){
 
 
   //Allocate space for NNs and dists
-  initIntMat( &nnsRBC, m, K );  //K is defined in defs.h
-  initMat( &distsRBC, m, K );
+  initIntMat( &nnsRBC, m, KMAX );  //KMAX is defined in defs.h
+  initMat( &distsRBC, m, KMAX );
   nnsRBC.mat = (unint*)calloc( sizeOfIntMat(nnsRBC), sizeof(*nnsRBC.mat) );
   distsRBC.mat = (real*)calloc( sizeOfMat(distsRBC), sizeof(*distsRBC.mat) );
 
@@ -92,9 +92,9 @@ int main(int argc, char**argv){
   if( runBrute ){
     intMatrix nnsBrute;
     matrix distsBrute;
-    initIntMat( &nnsBrute, m, K );
+    initIntMat( &nnsBrute, m, KMAX );
     nnsBrute.mat = (unint*)calloc( sizeOfIntMat(nnsBrute), sizeof(*nnsBrute.mat) );
-    initMat( &distsBrute, m, K );
+    initMat( &distsBrute, m, KMAX );
     distsBrute.mat = (real*)calloc( sizeOfMat(distsBrute), sizeof(*distsBrute.mat) );
     
     printf("running k-brute force..\n");
@@ -300,7 +300,7 @@ void evalKNNerror(matrix x, matrix q, intMatrix NNs){
   NNsB.r=q.r; NNsB.pr=q.pr; NNsB.c=NNsB.pc=32; NNsB.ld=NNsB.pc;
   NNsB.mat = (unint*)calloc( NNsB.pr*NNsB.pc, sizeof(*NNsB.mat) );
   matrix distsBrute;
-  distsBrute.r=q.r; distsBrute.pr=q.pr; distsBrute.c=distsBrute.pc=K; distsBrute.ld=distsBrute.pc;
+  distsBrute.r=q.r; distsBrute.pr=q.pr; distsBrute.c=distsBrute.pc=KMAX; distsBrute.ld=distsBrute.pc;
   distsBrute.mat = (real*)calloc( distsBrute.pr*distsBrute.pc, sizeof(*distsBrute.mat) );
 
   gettimeofday(&tvB,NULL);
@@ -309,8 +309,8 @@ void evalKNNerror(matrix x, matrix q, intMatrix NNs){
 
    //calc overlap
   for(i=0; i<m; i++){
-    for(j=0; j<K; j++){
-      for(k=0; k<K; k++){
+    for(j=0; j<KMAX; j++){
+      for(k=0; k<KMAX; k++){
 	ol[i] += ( NNs.mat[IDX(i, j, NNs.ld)] == NNsB.mat[IDX(i, k, NNsB.ld)] );
       }
     }
@@ -326,7 +326,7 @@ void evalKNNerror(matrix x, matrix q, intMatrix NNs){
   for(i=0;i<m;i++) {
     var += (((double)ol[i])-mean)*(((double)ol[i])-mean)/((double)m);
   }
-  printf("\tavg overlap = %6.4f/%d; std dev = %6.4f \n", mean, K, sqrt(var));
+  printf("\tavg overlap = %6.4f/%d; std dev = %6.4f \n", mean, KMAX, sqrt(var));
 
   FILE* fp;
   if(outFile){
@@ -336,7 +336,7 @@ void evalKNNerror(matrix x, matrix q, intMatrix NNs){
 
   real *ranges = (real*)calloc(q.pr,sizeof(*ranges));
   for(i=0;i<q.r;i++){
-    ranges[i] = distVec(q,x,i,NNs.mat[IDX(i, K-1, NNs.ld)]);
+    ranges[i] = distVec(q,x,i,NNs.mat[IDX(i, KMAX-1, NNs.ld)]);
   }
   
   unint *cnts = (unint*)calloc(q.pr,sizeof(*cnts));
@@ -378,13 +378,13 @@ void writeNeighbs(char *file, char *filetxt, intMatrix NNs, matrix dNNs){
     }
     
     for( i=0; i<m; i++ ){
-      for( j=0; j<K; j++ )
+      for( j=0; j<KMAX; j++ )
 	fprintf( fp, "%u ", NNs.mat[IDX( i, j, NNs.ld )] );
       fprintf(fp, "\n");
     }
     
     for( i=0; i<m; i++ ){
-      for( j=0; j<K; j++ )
+      for( j=0; j<KMAX; j++ )
 	fprintf( fp, "%f ", dNNs.mat[IDX( i, j, dNNs.ld )]); 
       fprintf(fp, "\n");
     }
@@ -401,9 +401,9 @@ void writeNeighbs(char *file, char *filetxt, intMatrix NNs, matrix dNNs){
     }
     
     for( i=0; i<m; i++ )
-      fwrite( &NNs.mat[IDX( i, 0, NNs.ld )], sizeof(*NNs.mat), K, fp );
+      fwrite( &NNs.mat[IDX( i, 0, NNs.ld )], sizeof(*NNs.mat), KMAX, fp );
     for( i=0; i<m; i++ )
-      fwrite( &dNNs.mat[IDX( i, 0, dNNs.ld )], sizeof(*dNNs.mat), K, fp );
+      fwrite( &dNNs.mat[IDX( i, 0, dNNs.ld )], sizeof(*dNNs.mat), KMAX, fp );
     
     fclose(fp);
   }

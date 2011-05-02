@@ -99,8 +99,8 @@ __global__ void planKNNKernel(const matrix Q, const unint *qMap, const matrix X,
   unint i,j,k;
   unint groupIts;
   
-  __shared__ real dNN[BLOCK_SIZE][K+BLOCK_SIZE];
-  __shared__ unint idNN[BLOCK_SIZE][K+BLOCK_SIZE];
+  __shared__ real dNN[BLOCK_SIZE][KMAX+BLOCK_SIZE];
+  __shared__ unint idNN[BLOCK_SIZE][KMAX+BLOCK_SIZE];
 
   __shared__ real Xs[BLOCK_SIZE][BLOCK_SIZE];
   __shared__ real Qs[BLOCK_SIZE][BLOCK_SIZE];
@@ -238,8 +238,8 @@ __global__ void knnKernel(const matrix Q, unint numDone, const matrix X, matrix 
   __shared__ real Xs[BLOCK_SIZE][BLOCK_SIZE];
   __shared__ real Qs[BLOCK_SIZE][BLOCK_SIZE];
   
-  __shared__ real dNN[BLOCK_SIZE][K+BLOCK_SIZE];
-  __shared__ unint idNN[BLOCK_SIZE][K+BLOCK_SIZE];
+  __shared__ real dNN[BLOCK_SIZE][KMAX+BLOCK_SIZE];
+  __shared__ unint idNN[BLOCK_SIZE][KMAX+BLOCK_SIZE];
 
   dNN[offQ][offX] = MAX_REAL;
   dNN[offQ][offX+16] = MAX_REAL;
@@ -572,45 +572,45 @@ __device__ void sort16off(real x[][48], unint xi[][48]){
   int j = threadIdx.y;
 
   if(i%2==0)
-    mmGateI( x[j]+K+i, x[j]+K+i+1, xi[j]+K+i, xi[j]+K+i+1 );
+    mmGateI( x[j]+KMAX+i, x[j]+KMAX+i+1, xi[j]+KMAX+i, xi[j]+KMAX+i+1 );
   __syncthreads();
 
   if(i%4<2)
-    mmGateI( x[j]+K+i, x[j]+K+i+2, xi[j]+K+i, xi[j]+K+i+2 );
+    mmGateI( x[j]+KMAX+i, x[j]+KMAX+i+2, xi[j]+KMAX+i, xi[j]+KMAX+i+2 );
   __syncthreads();
 
   if(i%4==1)
-    mmGateI( x[j]+K+i, x[j]+K+i+1, xi[j]+K+i, xi[j]+K+i+1 );
+    mmGateI( x[j]+KMAX+i, x[j]+KMAX+i+1, xi[j]+KMAX+i, xi[j]+KMAX+i+1 );
   __syncthreads();
   
   if(i%8<4)
-    mmGateI( x[j]+K+i, x[j]+K+i+4, xi[j]+K+i, xi[j]+K+i+4 );
+    mmGateI( x[j]+KMAX+i, x[j]+KMAX+i+4, xi[j]+KMAX+i, xi[j]+KMAX+i+4 );
   __syncthreads();
   
   if(i%8==2 || i%8==3)
-    mmGateI( x[j]+K+i, x[j]+K+i+2, xi[j]+K+i, xi[j]+K+i+2 );
+    mmGateI( x[j]+KMAX+i, x[j]+KMAX+i+2, xi[j]+KMAX+i, xi[j]+KMAX+i+2 );
   __syncthreads();
 
   if( i%2 && i%8 != 7 ) 
-    mmGateI( x[j]+K+i, x[j]+K+i+1, xi[j]+K+i, xi[j]+K+i+1 );
+    mmGateI( x[j]+KMAX+i, x[j]+KMAX+i+1, xi[j]+KMAX+i, xi[j]+KMAX+i+1 );
   __syncthreads();
   
   //0-7; 8-15 now sorted.  merge time.
   if( i<8)
-    mmGateI( x[j]+K+i, x[j]+K+i+8, xi[j]+K+i, xi[j]+K+i+8 );
+    mmGateI( x[j]+KMAX+i, x[j]+KMAX+i+8, xi[j]+KMAX+i, xi[j]+KMAX+i+8 );
   __syncthreads();
   
   if( i>3 && i<8 )
-    mmGateI( x[j]+K+i, x[j]+K+i+4, xi[j]+K+i, xi[j]+K+i+4 );
+    mmGateI( x[j]+KMAX+i, x[j]+KMAX+i+4, xi[j]+KMAX+i, xi[j]+KMAX+i+4 );
   __syncthreads();
   
   int os = (i/2)*4+2 + i%2;
   if(i<6)
-    mmGateI( x[j]+K+os, x[j]+K+os+2, xi[j]+K+os, xi[j]+K+os+2 );
+    mmGateI( x[j]+KMAX+os, x[j]+KMAX+os+2, xi[j]+KMAX+os, xi[j]+KMAX+os+2 );
   __syncthreads();
   
   if( i%2 && i<15)
-    mmGateI( x[j]+K+i, x[j]+K+i+1, xi[j]+K+i, xi[j]+K+i+1 );
+    mmGateI( x[j]+KMAX+i, x[j]+KMAX+i+1, xi[j]+KMAX+i, xi[j]+KMAX+i+1 );
 }
 
 //min-max gate: it sets the minimum of x and y into x, the maximum into y, and 

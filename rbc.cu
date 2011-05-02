@@ -331,15 +331,15 @@ void computeNNs(matrix dx, intMatrix dxMap, matrix dq, unint *dqMap, compPlan dc
 void computeKNNs(matrix dx, intMatrix dxMap, matrix dq, unint *dqMap, compPlan dcP, intMatrix NNs, matrix NNdists, unint compLength){
   matrix dNNdists;
   intMatrix dMinIDs;
-  dNNdists.r=compLength; dNNdists.pr=compLength; dNNdists.c=K; dNNdists.pc=K; dNNdists.ld=dNNdists.pc;
-  dMinIDs.r=compLength; dMinIDs.pr=compLength; dMinIDs.c=K; dMinIDs.pc=K; dMinIDs.ld=dMinIDs.pc;
+  dNNdists.r=compLength; dNNdists.pr=compLength; dNNdists.c=KMAX; dNNdists.pc=KMAX; dNNdists.ld=dNNdists.pc;
+  dMinIDs.r=compLength; dMinIDs.pr=compLength; dMinIDs.c=KMAX; dMinIDs.pc=KMAX; dMinIDs.ld=dMinIDs.pc;
 
   checkErr( cudaMalloc((void**)&dNNdists.mat,dNNdists.pr*dNNdists.pc*sizeof(*dNNdists.mat)) );
   checkErr( cudaMalloc((void**)&dMinIDs.mat,dMinIDs.pr*dMinIDs.pc*sizeof(*dMinIDs.mat)) );
 
   planKNNWrap(dq, dqMap, dx, dxMap, dNNdists, dMinIDs, dcP, compLength);
-  cudaMemcpy( NNs.mat, dMinIDs.mat, dq.r*K*sizeof(*NNs.mat), cudaMemcpyDeviceToHost );
-  cudaMemcpy( NNdists.mat, dNNdists.mat, dq.r*K*sizeof(*NNdists.mat), cudaMemcpyDeviceToHost );
+  cudaMemcpy( NNs.mat, dMinIDs.mat, dq.r*KMAX*sizeof(*NNs.mat), cudaMemcpyDeviceToHost );
+  cudaMemcpy( NNdists.mat, dNNdists.mat, dq.r*KMAX*sizeof(*NNdists.mat), cudaMemcpyDeviceToHost );
 
   cudaFree(dNNdists.mat);
   cudaFree(dMinIDs.mat);
