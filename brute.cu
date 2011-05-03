@@ -98,6 +98,39 @@ void bruteK(matrix x, matrix q, intMatrix NNs, matrix NNdists){
 }
 
 
+void warmBruteK(matrix x, matrix q, unint numDoneX, intMatrix NNs, matrix NNdists){
+  matrix dNNdists;
+  intMatrix dMinIDs;
+  matrix dx, dq;
+  
+  dx.r=x.r; dx.pr=x.pr; dx.c=x.c; dx.pc=x.pc; dx.ld=x.ld;
+  dq.r=q.r; dq.pr=q.pr; dq.c=q.c; dq.pc=q.pc; dq.ld=q.ld;
+  dNNdists.r=q.r; dNNdists.pr=q.pr; dNNdists.c=KMAX; dNNdists.pc=KMAX; dNNdists.ld=dNNdists.pc;
+  dMinIDs.r=q.r; dMinIDs.pr=q.pr; dMinIDs.c=KMAX; dMinIDs.pc=KMAX; dMinIDs.ld=dMinIDs.pc;
+
+  checkErr( cudaMalloc((void**)&dNNdists.mat, dNNdists.pc*dNNdists.pr*sizeof(*dNNdists.mat)) );
+  checkErr( cudaMalloc((void**)&dMinIDs.mat, dMinIDs.pc*dMinIDs.pr*sizeof(*dMinIDs.mat)) );
+  checkErr( cudaMalloc((void**)&dx.mat, dx.pr*dx.pc*sizeof(*dx.mat)) );
+  checkErr( cudaMalloc((void**)&dq.mat, dq.pr*dq.pc*sizeof(*dq.mat)) );
+
+  cudaMemcpy(dMinIDs.mat, NNs.mat, NNs.pc*NNs.pr*sizeof(*NNs.mat),cudaMemcpyHostToDevice);
+  cudaMemcpy(dNNdists.mat, NNdists.mat, NNdists.pc*NNdists.pr*sizeof(*NNdists.mat),cudaMemcpyHostToDevice);
+  cudaMemcpy(dx.mat,x.mat,x.pr*x.pc*sizeof(*dx.mat),cudaMemcpyHostToDevice);
+  cudaMemcpy(dq.mat,q.mat,q.pr*q.pc*sizeof(*dq.mat),cudaMemcpyHostToDevice);
+  
+
+  warmKnnWrap(dq,dx,numDoneX, dNNdists,dMinIDs);
+
+  cudaMemcpy(NNs.mat,dMinIDs.mat,NNs.pr*NNs.pc*sizeof(*NNs.mat),cudaMemcpyDeviceToHost);
+  cudaMemcpy(NNdists.mat,dNNdists.mat,NNdists.pr*NNdists.pc*sizeof(*NNdists.mat),cudaMemcpyDeviceToHost);
+
+  cudaFree(dNNdists.mat);
+  cudaFree(dMinIDs.mat);
+  cudaFree(dx.mat);
+  cudaFree(dq.mat);
+}
+
+
 void bruteCPU(matrix X, matrix Q, unint *NNs){
   real *dtoNNs; 
   real temp;

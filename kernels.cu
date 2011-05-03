@@ -281,6 +281,64 @@ __global__ void knnKernel(const matrix Q, unint numDone, const matrix X, matrix 
   
 }
 
+
+//Computes the 32-NNs for each query in Q, with a warm start. 
+__global__ void warmKnnKernel(const matrix Q, unint numDone, const matrix X, unint numDoneX, matrix dMins, intMatrix dMinIDs){
+  unint qB = blockIdx.y * BLOCK_SIZE + numDone;  //indexes Q
+  unint xB; //indexes X;
+  unint cB; //colBlock
+  unint offQ = threadIdx.y; //the offset of qPos in this block
+  unint offX = threadIdx.x; //ditto for x
+  unint i;
+  real ans;
+
+  __shared__ real Xs[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ real Qs[BLOCK_SIZE][BLOCK_SIZE];
+  
+  __shared__ real dNN[BLOCK_SIZE][KMAX+BLOCK_SIZE];
+  __shared__ unint idNN[BLOCK_SIZE][KMAX+BLOCK_SIZE];
+
+  dNN[offQ][offX] = dMins.mat[IDX( qB+offQ, offX, dMins.ld )]; 
+  dNN[offQ][offX+16] = dMins.mat[IDX( qB+offQ, offX+16, dMins.ld )]; 
+  idNN[offQ][offX] = dMinIDs.mat[IDX( qB+offQ, offX, dMinIDs.ld )];
+  idNN[offQ][offX+16] = dMinIDs.mat[IDX( qB+offQ, offX+16, dMinIDs.ld )];
+  
+  __syncthreads();
+
+  for(xB=0; xB<X.pr; xB+=BLOCK_SIZE){
+    ans=0;
+    for(cB=0; cB<X.pc; cB+=BLOCK_SIZE){
+      
+      //Each thread loads one element of X and Q into memory.
+      Xs[offX][offQ] = X.mat[IDX( xB+offQ, cB+offX, X.ld )];
+      Qs[offX][offQ] = Q.mat[IDX( qB+offQ, cB+offX, Q.ld )];
+      __syncthreads();
+      
+      for(i=0;i<BLOCK_SIZE;i++)
+	ans += DIST( Xs[i][offX], Qs[i][offQ] );
+      
+      __syncthreads();
+    }
+ 
+    dNN[offQ][offX+32] = (xB+offX<X.r)? ans:MAX_REAL;
+    idNN[offQ][offX+32] = numDoneX + xB + offX;
+    __syncthreads();
+
+    sort16off( dNN, idNN );
+    __syncthreads();
+
+    merge32x16( dNN, idNN );
+  }
+  __syncthreads();
+  
+  dMins.mat[IDX(qB+offQ, offX, dMins.ld)] = dNN[offQ][offX];
+  dMins.mat[IDX(qB+offQ, offX+16, dMins.ld)] = dNN[offQ][offX+16];
+  dMinIDs.mat[IDX(qB+offQ, offX, dMins.ld)] = idNN[offQ][offX];
+  dMinIDs.mat[IDX(qB+offQ, offX+16, dMins.ld)] = idNN[offQ][offX+16];
+  
+}
+
+
 //Computes all pairs of distances between Q and X.
 __global__ void dist1Kernel(const matrix Q, unint qStart, const matrix X, unint xStart, matrix D){
   unint c, i, j;

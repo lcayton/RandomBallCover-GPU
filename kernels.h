@@ -11,6 +11,7 @@ __global__ void planKNNKernel(const matrix,const unint*,const matrix,const intMa
 __global__ void dist1Kernel(const matrix,unint,const matrix,unint,matrix);
 __global__ void nnKernel(const matrix,unint,const matrix,real*,unint*);
 __global__ void knnKernel(const matrix,unint,const matrix,matrix,intMatrix);
+__global__ void warmKnnKernel(const matrix,unint,const matrix,unint,matrix,intMatrix);
 __global__ void findRangeKernel(const matrix,unint,real*,unint);
 __global__ void rangeSearchKernel(const matrix,unint,unint,const real*,charMatrix);
 __global__ void rangeCountKernel(const matrix,unint,const matrix,real*,unint*);

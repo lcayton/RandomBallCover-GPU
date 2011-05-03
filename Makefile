@@ -5,9 +5,9 @@ NVCCFLAGS=-O3
 # Note that you will need to specify an arch (as above) if you wish to use
 # double precision
 LINKFLAGS=-lcuda -lm
-CUSOURCES=driver.cu utils.cu utilsGPU.cu rbc.cu brute.cu kernels.cu kernelWrap.cu sKernel.cu sKernelWrap.cu
+CUSOURCES=bruteDriver.cu utils.cu utilsGPU.cu rbc.cu brute.cu kernels.cu kernelWrap.cu sKernel.cu sKernelWrap.cu
 CUOBJECTS=$(CUSOURCES:.cu=.o)
-EXECUTABLE=testRBC
+EXECUTABLE=testBrute
 all: $(CUSOURCES) $(EXECUTABLE)
 
 $(EXECUTABLE): $(OBJECTS) $(CUOBJECTS)
