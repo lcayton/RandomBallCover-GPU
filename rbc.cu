@@ -122,6 +122,49 @@ void kqueryRBC(const matrix q, const rbcStruct rbcS, intMatrix NNs, matrix NNdis
   free(groupCountQ);
 }
 
+void buildBigRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
+  unint n = x.pr; 
+
+  setupReps( x, rbcS, numReps );
+  
+  real *dranges;
+  checkErr( cudaMalloc( (void**)&dranges, numReps*sizeof(*dranges) ) );
+  unint *dcounts;
+  checkErr( cudaMalloc( (void**)&dcounts, numReps*sizeof(*dcounts) ) );
+  
+  //assume all of x is in CPU RAM
+  //see how much fits onto the GPU at once.
+  size_t memFree, memTot;
+  cudaMemGetInfo(&memFree, &memTot);
+  memFree = (size_t)(((double)memFree)*MEM_USABLE);
+  unint memPerPt = x.pc*sizeof(*x.mat);
+  unint ptsAtOnce = MIN( DPAD(memFree/memPerPt), n );
+  
+  matrix dx;
+  initMat( &dx, n, x.c );
+  checkErr( cudaMalloc( (void**)&dx.mat, sizeOfMatB( dx ) ) );
+  
+  //FIX init the ranges to something sensible.  
+
+  unint numLeft = n;
+  unint row = 0; //current row of x
+  unint pi, pip;
+  while( numLeft > 0 ){
+    pi = MIN( ptsAtOnce, numLeft );
+    pip = PAD( pi );
+    cudaMemcpy( dx.mat, &x.mat[IDX( row, 0, x.ld )], pi*x.pc*sizeof(*x.mat), cudaMemcpyHostToDevice );
+
+    rangeCountWrap( rbcS->dr, dx, dranges, dcounts ); //FIX to be a warm start
+    numLeft -= pi;
+    row += pi;
+  }
+  
+  //now adjust the ranges
+
+  cudaFree( dcounts );
+  cudaFree( dranges );
+}
+
 
 void buildRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
   unint n = x.pr;

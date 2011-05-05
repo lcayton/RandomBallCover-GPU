@@ -595,7 +595,7 @@ __device__ void sort16off(real x[][48], unint xi[][48]){
     mmGateI( x[j]+KMAX+i, x[j]+KMAX+i+1, xi[j]+KMAX+i, xi[j]+KMAX+i+1 );
   __syncthreads();
   
-  //0-7; 8-15 now sorted.  merge time.
+  //0-7; 8-15 now sorted.  now merge.
   if( i<8)
     mmGateI( x[j]+KMAX+i, x[j]+KMAX+i+8, xi[j]+KMAX+i, xi[j]+KMAX+i+8 );
   __syncthreads();
@@ -622,6 +622,88 @@ __device__ void mmGateI(real *x, real *y, unint *xi, unint *yi){
   real t = MIN( *x, *y );
   *y = MAX( *x, *y );
   *x = t;
+}
+
+
+__global__ void heapInsert(real x[][16], unint xi[][16], matrix h, intMatrix hi, unint rowOff){
+  unint i;
+  unint ti = threadIdx.x; 
+  unint tj = threadIdx.y;
+  unint hr = rowOff + tj;
+  
+  __shared__ real sx[16][48];
+  __shared__ unint sxi[16][48];
+
+  sx[tj][ 32+ti ] = x[tj][ ti ];
+  sxi[tj][ 32+ti ] = xi[tj][ ti ];
+  __syncthreads();
+  
+  sort16off( sx, sxi ); //sorts the last 16
+  __syncthreads();
+  
+  for( i=0; i<h.pc/32; i++ ){  //FIX: might be a problem if h is padded.
+    sx[tj][ ti ] = h.mat[IDX( hr, i*32+ti, h.ld )];
+    sx[tj][ ti + 16 ] = h.mat[IDX( hr, i*32+ti+16, h.ld )];
+    sxi[tj][ ti ] = hi.mat[IDX( hr, i*32+ti, hi.ld )];
+    sxi[tj][ ti + 16 ] = hi.mat[IDX( hr, i*32+ti+16, hi.ld )];
+    __syncthreads();
+    
+    merge32x16( sx, sxi );
+    __syncthreads();
+    
+    h.mat[IDX( hr, i*32+ti, h.ld )] = sx[tj][ ti ];
+    h.mat[IDX( hr, i*32+ti+16, h.ld )] = sx[tj][ ti + 16 ]; 
+    hi.mat[IDX( hr, i*32+ti, hi.ld )] = sxi[tj][ ti ];
+    hi.mat[IDX( hr, i*32+ti+16, hi.ld )] = sxi[tj][ ti + 16 ]; 
+  }
+}
+
+
+__global__ void bigKnnKernel(const matrix Q, unint numDone, const matrix X, matrix dMins, intMatrix dMinIDs){
+  unint qB = blockIdx.y * BLOCK_SIZE + numDone;  //indexes Q
+  unint xB; //indexes X;
+  unint cB; //colBlock
+  unint offQ = threadIdx.y; //the offset of qPos in this block
+  unint offX = threadIdx.x; //ditto for x
+  unint i;
+  real ans;
+
+  __shared__ real Xs[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ real Qs[BLOCK_SIZE][BLOCK_SIZE];
+  
+  __shared__ real dNN[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ unint idNN[BLOCK_SIZE][BLOCK_SIZE];
+
+  /* dNN[offQ][offX] = MAX_REAL; */
+  /* dNN[offQ][offX+16] = MAX_REAL; */
+  /* idNN[offQ][offX] = DUMMY_IDX; */
+  /* idNN[offQ][offX+16] = DUMMY_IDX; */
+  
+  /* __syncthreads(); */
+
+  for(xB=0; xB<X.pr; xB+=BLOCK_SIZE){
+    ans=0;
+    for(cB=0; cB<X.pc; cB+=BLOCK_SIZE){
+      
+      //Each thread loads one element of X and Q into memory.
+      Xs[offX][offQ] = X.mat[IDX( xB+offQ, cB+offX, X.ld )];
+      Qs[offX][offQ] = Q.mat[IDX( qB+offQ, cB+offX, Q.ld )];
+      __syncthreads();
+      
+      for(i=0;i<BLOCK_SIZE;i++)
+	ans += DIST( Xs[i][offX], Qs[i][offQ] );
+      
+      __syncthreads();
+    }
+ 
+    dNN[offQ][offX] = (xB+offX<X.r)? ans:MAX_REAL;
+    idNN[offQ][offX] = xB + offX;
+    __syncthreads();
+    
+    heapInsert( dNN, idNN, dMins, dMinIDs, numDone );
+  }
+  
+  
 }
 
 #endif

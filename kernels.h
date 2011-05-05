@@ -18,4 +18,5 @@ __device__ void sort16(real[][16],unint[][16]);
 __device__ void sort16off(real[][48],unint[][48]);
 __device__ void merge32x16(real[][48],unint[][48]);
 __device__ void mmGateI(real*,real*,unint*,unint*);
+__global__ void heapInsert(real x[][16], unint xi[][16], matrix h, intMatrix hi, unint rowOff);
 #endif

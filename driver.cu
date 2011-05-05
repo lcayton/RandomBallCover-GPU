@@ -14,6 +14,8 @@
 #include "brute.h"
 #include "sKernel.h"
 
+#include "kernels.h" //delete
+
 void parseInput(int,char**);
 void readData(char*,matrix);
 void readDataText(char*,matrix);
@@ -37,7 +39,7 @@ int main(int argc, char**argv){
   printf("RANDOM BALL COVER\n");
   printf("*****************\n");
   
-  parseInput(argc,argv);
+  //parseInput(argc,argv);
   
   gettimeofday( &tvB, NULL );
   printf("Using GPU #%d\n",deviceNum); 
@@ -52,6 +54,36 @@ int main(int argc, char**argv){
   gettimeofday( &tvE, NULL );
   printf(" init time: %6.2f \n", timeDiff( tvB, tvE ) );
   
+  unint zlen = 2048;
+  unint hlen = 32;
+  real *z = (real*)calloc( zlen, sizeof(*z) );
+  real *h = (real*)calloc( hlen, sizeof(*h) );
+  real *dz, *dh;
+  cudaMalloc( (void**)&dz, zlen*sizeof(*dz) );
+  cudaMalloc( (void**)&dh, hlen*sizeof(*h) );
+  unint i;
+  srand((unsigned int)tvE.tv_usec);
+  for( i=0; i<zlen; i++ ){
+    do
+      z[i] = rand();
+    while (z[i] > 100000);
+  }
+  for(i=0; i<hlen; i++)
+    h[i] = MAX_REAL;
+  cudaMemcpy( dz, z, zlen*sizeof(*dz), cudaMemcpyHostToDevice );
+  cudaMemcpy( dh, h, hlen*sizeof(*h), cudaMemcpyHostToDevice );
+  dim3 block(16,1);
+  dim3 grid(1,1);
+  heapSort<<<grid,block>>>( dz, dh, zlen, hlen );
+  
+  cudaMemcpy( h, dh, hlen*sizeof(*h), cudaMemcpyDeviceToHost );
+  for( i=0; i<hlen-1; i++ ){
+    printf("%6.2f ", h[i]); 
+    if( h[i] > h[i+1] )
+      printf("error\n");
+  }
+  printf("\n");
+  return;
 
   //Setup matrices
   initMat( &x, n, d );
