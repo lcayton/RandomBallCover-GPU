@@ -122,15 +122,39 @@ void kqueryRBC(const matrix q, const rbcStruct rbcS, intMatrix NNs, matrix NNdis
   free(groupCountQ);
 }
 
+
+#define RPI 1024 //reps per it
+//s needs to be a multiple of 32, numReps a multiple of RPI
 void buildBigRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
+  unint i;
   unint n = x.pr; 
 
   setupReps( x, rbcS, numReps );
-  
-  real *dranges;
-  checkErr( cudaMalloc( (void**)&dranges, numReps*sizeof(*dranges) ) );
-  unint *dcounts;
-  checkErr( cudaMalloc( (void**)&dcounts, numReps*sizeof(*dcounts) ) );
+  intMatrix xmap; 
+  initIntMat( &xmap, numReps, s ); 
+  xmap.mat = (unint*)calloc( sizeOfIntMat(xmap), sizeof(*xmap.mat) );
+
+  intMatrix dhi; //a subset of xMap (used as heap)
+  matrix dh; //corresponding dists
+  initIntMat( &dhi, RPI, s );
+  initMat( &dh, RPI, s );
+  cudaMalloc( (void**)&dhi.mat, sizeOfIntMatB( dhi ) );
+  cudaMalloc( (void**)&dh.mat, sizeOfMatB( dh ) );
+
+  matrix dr; //subset of the reps
+  initMat( &dr, RPI, x.c );
+  cudaMalloc( (void**)&dr.mat, sizeOfMatB( dr ) );
+
+  //dummy heap used for reseting
+  matrix max_h;
+  initMat( &max_h, RPI, s );
+  max_h.mat = (real*)calloc( sizeOfMat(max_h), sizeof(*max_h.mat) );
+  for( i=0; i<sizeOfMat(max_h); i++ )
+    max_h.mat[i] = MAX_REAL;
+
+  matrix zeros;
+  initMat( &zeros, BLOCK_SIZE, s );
+  zeros.mat = (real*)calloc( sizeOfMat(zeros), sizeof(*zeros.mat) );
   
   //assume all of x is in CPU RAM
   //see how much fits onto the GPU at once.
@@ -140,29 +164,66 @@ void buildBigRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
   unint memPerPt = x.pc*sizeof(*x.mat);
   unint ptsAtOnce = MIN( DPAD(memFree/memPerPt), n );
   
+  //allocate the temp dx which is on the device.
   matrix dx;
   initMat( &dx, n, x.c );
   checkErr( cudaMalloc( (void**)&dx.mat, sizeOfMatB( dx ) ) );
-  
-  //FIX init the ranges to something sensible.  
 
-  unint numLeft = n;
-  unint row = 0; //current row of x
-  unint pi, pip;
-  while( numLeft > 0 ){
-    pi = MIN( ptsAtOnce, numLeft );
-    pip = PAD( pi );
-    cudaMemcpy( dx.mat, &x.mat[IDX( row, 0, x.ld )], pi*x.pc*sizeof(*x.mat), cudaMemcpyHostToDevice );
+  for( i=0; i<numReps/RPI; i++ ){
+    //reset the heap dists
+    cudaMemcpy( dh.mat, max_h.mat, sizeOfMatB( dh ), cudaMemcpyHostToDevice );
+    //copy the appropriate rows into dr
+    cudaMemcpy( dr.mat, &rbcS->dr.mat[IDX( i*RPI, 0, rbcS->dr.ld )], sizeOfMatB( dr ), cudaMemcpyDeviceToDevice );
+    
+    unint numLeft = n;
+    unint row = 0; //current row of x
+    unint pi, pip;
+    unint its=0;
+    while( numLeft > 0 ){
+      pi = MIN( ptsAtOnce, numLeft );
+      pip = PAD( pi );
+      cudaMemcpy( dx.mat, &x.mat[IDX( row, 0, x.ld )], pi*x.pc*sizeof(*x.mat), cudaMemcpyHostToDevice );
+      dx.r = pi; dx.pr = pip;
 
-    rangeCountWrap( rbcS->dr, dx, dranges, dcounts ); //FIX to be a warm start
-    numLeft -= pi;
-    row += pi;
+      //need to zero-out x.mat
+      if( pip-pi )
+	cudaMemcpy( &dx.mat[IDX( pi, 0, x.ld )], zeros.mat, (pip-pi)*x.pc*sizeof(*x.mat), cudaMemcpyHostToDevice );
+      
+      struct timeval tvE, tvB;
+      gettimeofday( &tvB, NULL);
+      nnHeapWrap( dr, dx, dh, dhi  );
+      gettimeofday( &tvE, NULL);
+      printf("time elapsed for nnHeapWrap : %6.2f \n", timeDiff(tvB,tvE) );
+
+      numLeft -= pi;
+      row += pi;
+    }
+    
+    cudaMemcpy( &xmap.mat[IDX( i*RPI, 0, xmap.ld )], dhi.mat, sizeOfIntMatB(dhi), cudaMemcpyDeviceToHost );
   }
   
-  //now adjust the ranges
+  
+  cudaFree( dh.mat );
+  cudaFree( dhi.mat );
+  cudaFree( dx.mat );
+  cudaFree( dr.mat );
 
-  cudaFree( dcounts );
-  cudaFree( dranges );
+  printf("done iterating.. copying over\n");
+  cudaMemGetInfo(&memFree, &memTot);
+  printf("GPU memory free = %lu/%lu (MB) \n",(unsigned long)memFree/(1024*1024),(unsigned long)memTot/(1024*1024));
+  
+  //DEBUG:
+  copyAndMove( &rbcS->dx, &x );
+  copyAndMoveI( &rbcS->dxMap, &xmap );
+  rbcS->groupCount = (unint*)calloc( numReps, sizeof(unint) );
+  for( i=0; i<numReps; i++ )
+    rbcS->groupCount[i] = s;
+  //END
+
+  free( zeros.mat );
+  free( xmap.mat );  
+  free( max_h.mat );
+
 }
 
 

@@ -9,6 +9,7 @@
 
 
 void buildRBC(const matrix,rbcStruct*,unint, unint);
+void buildBigRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s);
 void queryRBC(const matrix,const rbcStruct,unint*,real*);
 void kqueryRBC(const matrix,const rbcStruct,intMatrix,matrix);
 void destroyRBC(rbcStruct*);

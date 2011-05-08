@@ -39,7 +39,7 @@ int main(int argc, char**argv){
   printf("RANDOM BALL COVER\n");
   printf("*****************\n");
   
-  //parseInput(argc,argv);
+  parseInput(argc,argv);
   
   gettimeofday( &tvB, NULL );
   printf("Using GPU #%d\n",deviceNum); 
@@ -54,36 +54,36 @@ int main(int argc, char**argv){
   gettimeofday( &tvE, NULL );
   printf(" init time: %6.2f \n", timeDiff( tvB, tvE ) );
   
-  unint zlen = 2048;
-  unint hlen = 32;
-  real *z = (real*)calloc( zlen, sizeof(*z) );
-  real *h = (real*)calloc( hlen, sizeof(*h) );
-  real *dz, *dh;
-  cudaMalloc( (void**)&dz, zlen*sizeof(*dz) );
-  cudaMalloc( (void**)&dh, hlen*sizeof(*h) );
-  unint i;
-  srand((unsigned int)tvE.tv_usec);
-  for( i=0; i<zlen; i++ ){
-    do
-      z[i] = rand();
-    while (z[i] > 100000);
-  }
-  for(i=0; i<hlen; i++)
-    h[i] = MAX_REAL;
-  cudaMemcpy( dz, z, zlen*sizeof(*dz), cudaMemcpyHostToDevice );
-  cudaMemcpy( dh, h, hlen*sizeof(*h), cudaMemcpyHostToDevice );
-  dim3 block(16,1);
-  dim3 grid(1,1);
-  heapSort<<<grid,block>>>( dz, dh, zlen, hlen );
+  /* unint zlen = 2048; */
+  /* unint hlen = 32; */
+  /* real *z = (real*)calloc( zlen, sizeof(*z) ); */
+  /* real *h = (real*)calloc( hlen, sizeof(*h) ); */
+  /* real *dz, *dh; */
+  /* cudaMalloc( (void**)&dz, zlen*sizeof(*dz) ); */
+  /* cudaMalloc( (void**)&dh, hlen*sizeof(*h) ); */
+  /* unint i; */
+  /* srand((unsigned int)tvE.tv_usec); */
+  /* for( i=0; i<zlen; i++ ){ */
+  /*   do */
+  /*     z[i] = rand(); */
+  /*   while (z[i] > 100000); */
+  /* } */
+  /* for(i=0; i<hlen; i++) */
+  /*   h[i] = MAX_REAL; */
+  /* cudaMemcpy( dz, z, zlen*sizeof(*dz), cudaMemcpyHostToDevice ); */
+  /* cudaMemcpy( dh, h, hlen*sizeof(*h), cudaMemcpyHostToDevice ); */
+  /* dim3 block(16,1); */
+  /* dim3 grid(1,1); */
+  /* heapSort<<<grid,block>>>( dz, dh, zlen, hlen ); */
   
-  cudaMemcpy( h, dh, hlen*sizeof(*h), cudaMemcpyDeviceToHost );
-  for( i=0; i<hlen-1; i++ ){
-    printf("%6.2f ", h[i]); 
-    if( h[i] > h[i+1] )
-      printf("error\n");
-  }
-  printf("\n");
-  return;
+  /* cudaMemcpy( h, dh, hlen*sizeof(*h), cudaMemcpyDeviceToHost ); */
+  /* for( i=0; i<hlen-1; i++ ){ */
+  /*   printf("%6.2f ", h[i]);  */
+  /*   if( h[i] > h[i+1] ) */
+  /*     printf("error\n"); */
+  /* } */
+  /* printf("\n"); */
+  /* return; */
 
   //Setup matrices
   initMat( &x, n, d );
@@ -111,7 +111,8 @@ int main(int argc, char**argv){
   //Build the RBC
   printf("building the rbc..\n");
   gettimeofday( &tvB, NULL );
-  buildRBC( x, &rbcS, numReps, numReps );
+  //buildRBC( x, &rbcS, numReps, numReps );
+  buildBigRBC( x, &rbcS, numReps, numReps );
   gettimeofday( &tvE, NULL );
   printf( "\t.. build time = %6.4f \n", timeDiff(tvB,tvE) );
   
@@ -121,6 +122,8 @@ int main(int argc, char**argv){
   gettimeofday( &tvE, NULL );
   printf( "\t.. query time for krbc = %6.4f \n", timeDiff(tvB,tvE) );
   
+  destroyRBC( &rbcS );
+
   if( runBrute ){
     intMatrix nnsBrute;
     matrix distsBrute;
@@ -150,7 +153,6 @@ int main(int argc, char**argv){
   if( outFile || outFiletxt )
     writeNeighbs( outFile, outFiletxt, nnsRBC, distsRBC );
 
-  destroyRBC( &rbcS );
   cudaThreadExit();
   free( nnsRBC.mat );
   free( distsRBC.mat );
@@ -282,6 +284,8 @@ void readDataText(char *dataFile, matrix x){
 void evalNNerror(matrix x, matrix q, unint *NNs){
   struct timeval tvB, tvE;
   unint i;
+
+  
 
   printf("\nComputing error rates (this might take a while)\n");
   real *ranges = (real*)calloc(q.pr,sizeof(*ranges));

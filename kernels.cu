@@ -625,7 +625,7 @@ __device__ void mmGateI(real *x, real *y, unint *xi, unint *yi){
 }
 
 
-__global__ void heapInsert(real x[][16], unint xi[][16], matrix h, intMatrix hi, unint rowOff){
+__device__ void heapInsert(real x[][16], unint xi[][16], matrix h, intMatrix hi, unint rowOff){
   unint i;
   unint ti = threadIdx.x; 
   unint tj = threadIdx.y;
@@ -659,7 +659,7 @@ __global__ void heapInsert(real x[][16], unint xi[][16], matrix h, intMatrix hi,
 }
 
 
-__global__ void bigKnnKernel(const matrix Q, unint numDone, const matrix X, matrix dMins, intMatrix dMinIDs){
+__global__ void nnHeapKernel(const matrix Q, unint numDone, const matrix X, matrix dh, intMatrix dhi){
   unint qB = blockIdx.y * BLOCK_SIZE + numDone;  //indexes Q
   unint xB; //indexes X;
   unint cB; //colBlock
@@ -674,12 +674,6 @@ __global__ void bigKnnKernel(const matrix Q, unint numDone, const matrix X, matr
   __shared__ real dNN[BLOCK_SIZE][BLOCK_SIZE];
   __shared__ unint idNN[BLOCK_SIZE][BLOCK_SIZE];
 
-  /* dNN[offQ][offX] = MAX_REAL; */
-  /* dNN[offQ][offX+16] = MAX_REAL; */
-  /* idNN[offQ][offX] = DUMMY_IDX; */
-  /* idNN[offQ][offX+16] = DUMMY_IDX; */
-  
-  /* __syncthreads(); */
 
   for(xB=0; xB<X.pr; xB+=BLOCK_SIZE){
     ans=0;
@@ -700,7 +694,7 @@ __global__ void bigKnnKernel(const matrix Q, unint numDone, const matrix X, matr
     idNN[offQ][offX] = xB + offX;
     __syncthreads();
     
-    heapInsert( dNN, idNN, dMins, dMinIDs, numDone );
+    heapInsert( dNN, idNN, dh, dhi, qB );
   }
   
   

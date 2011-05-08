@@ -163,4 +163,22 @@ void rangeCountWrap(const matrix dq, const matrix dx, real *dranges, unint *dcou
   cudaThreadSynchronize();
 }
 
+
+void nnHeapWrap(const matrix dq, const matrix dx, matrix dh, intMatrix dhi){
+  dim3 block(BLOCK_SIZE,BLOCK_SIZE);
+  dim3 grid;
+  unint numDone, todo;
+  
+  grid.x = 1;
+
+  numDone = 0;
+  while( numDone < dq.pr ){
+    todo = MIN( dq.pr - numDone, MAX_BS*BLOCK_SIZE );
+    grid.y = todo/BLOCK_SIZE;
+    nnHeapKernel<<<grid,block>>>(dq,numDone,dx,dh,dhi);
+    numDone += todo;
+  }
+  cudaThreadSynchronize();
+
+}
 #endif
