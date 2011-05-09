@@ -122,6 +122,15 @@ void kqueryRBC(const matrix q, const rbcStruct rbcS, intMatrix NNs, matrix NNdis
   free(groupCountQ);
 }
 
+void buildVor( const matrix x, rbcStruct *rbcS, unint numReps, unint ol){
+  ol = MIN( ol, 32 );
+  
+  unint n = x.r;
+  
+  setupReps( x, rbcS, numReps );
+}
+  
+
 
 #define RPI 1024 //reps per it
 //s needs to be a multiple of 32, numReps a multiple of RPI
@@ -224,7 +233,6 @@ void buildBigRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
   free( zeros.mat );
   free( xmap.mat );  
   free( max_h.mat );
-
 }
 
 
