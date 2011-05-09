@@ -172,11 +172,11 @@ size_t sizeOfIntMatB(intMatrix x){
 }
 // returns the numbers of elements in a matrix
 size_t sizeOfMat(matrix x){
-  return x.pr*x.pc;
+  return ((size_t)x.pr)*x.pc;
 }
 
 size_t sizeOfIntMat(intMatrix x){
-  return x.pr*x.pc;
+  return ((size_t)x.pr)*x.pc;
 }
 
 
