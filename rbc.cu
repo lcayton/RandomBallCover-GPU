@@ -155,7 +155,7 @@ void buildBigRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
   matrix zeros;
   initMat( &zeros, BLOCK_SIZE, s );
   zeros.mat = (real*)calloc( sizeOfMat(zeros), sizeof(*zeros.mat) );
-  
+
   //assume all of x is in CPU RAM
   //see how much fits onto the GPU at once.
   size_t memFree, memTot;
@@ -164,9 +164,11 @@ void buildBigRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
   unint memPerPt = x.pc*sizeof(*x.mat);
   unint ptsAtOnce = MIN( DPAD(memFree/memPerPt), n );
   
+  printf(" mem free for x = %6.2f, ptsAtOnce = %u \n", ((double)memFree)/(1024.0*1024.0), ptsAtOnce);
+
   //allocate the temp dx which is on the device.
   matrix dx;
-  initMat( &dx, n, x.c );
+  initMat( &dx, ptsAtOnce, x.c );
   checkErr( cudaMalloc( (void**)&dx.mat, sizeOfMatB( dx ) ) );
 
   for( i=0; i<numReps/RPI; i++ ){
@@ -201,8 +203,7 @@ void buildBigRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
     
     cudaMemcpy( &xmap.mat[IDX( i*RPI, 0, xmap.ld )], dhi.mat, sizeOfIntMatB(dhi), cudaMemcpyDeviceToHost );
   }
-  
-  
+    
   cudaFree( dh.mat );
   cudaFree( dhi.mat );
   cudaFree( dx.mat );

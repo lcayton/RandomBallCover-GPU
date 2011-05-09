@@ -88,9 +88,11 @@ int main(int argc, char**argv){
   //Setup matrices
   initMat( &x, n, d );
   initMat( &q, m, d );
+  printf("mat size = %lu \n", sizeOfMat(x) );
   x.mat = (real*)calloc( sizeOfMat(x), sizeof(*(x.mat)) );
   q.mat = (real*)calloc( sizeOfMat(q), sizeof(*(q.mat)) );
-    
+
+
   //Load data 
   if( dataFileXtxt )
     readDataText( dataFileXtxt, x );
@@ -100,8 +102,7 @@ int main(int argc, char**argv){
     readDataText( dataFileQtxt, q );
   else
     readData( dataFileQ, q );
-
-
+  
   //Allocate space for NNs and dists
   initIntMat( &nnsRBC, m, KMAX );  //KMAX is defined in defs.h
   initMat( &distsRBC, m, KMAX );
