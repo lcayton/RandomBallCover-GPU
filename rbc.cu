@@ -124,10 +124,99 @@ void kqueryRBC(const matrix q, const rbcStruct rbcS, intMatrix NNs, matrix NNdis
 
 void buildVor( const matrix x, rbcStruct *rbcS, unint numReps, unint ol){
   ol = MIN( ol, 32 );
-  
-  unint n = x.r;
+  unint i, j;
+  unint n = x.pr;
   
   setupReps( x, rbcS, numReps );
+
+  matrix dists;
+  initMat( &dists, x.r, KMAX );
+  dists.mat = (real*)calloc( sizeOfMat(dists), sizeof(dists.mat) );
+  intMatrix nns; 
+  initIntMat( &nns, x.r, KMAX );
+  nns.mat = (unint*)calloc( sizeOfIntMat(nns), sizeof(nns.mat) );
+
+  matrix zeros;
+  initMat( &zeros, BLOCK_SIZE, x.c );
+  zeros.mat = (real*)calloc( sizeOfMat(zeros), sizeof(*zeros.mat) );
+
+  //assume all of x is in CPU RAM
+  //see how much fits onto the GPU at once.
+  size_t memFree, memTot;
+  cudaMemGetInfo(&memFree, &memTot);
+  memFree = (size_t)(((double)memFree)*MEM_USABLE);
+  unint memPerPt = x.pc*sizeof(*x.mat) + sizeof(real) + sizeof(unint);
+  unint ptsAtOnce = MIN( DPAD(memFree/memPerPt), n );
+
+  matrix dx;
+  initMat( &dx, ptsAtOnce, x.c );
+  checkErr( cudaMalloc( (void**)&dx.mat, sizeOfMatB( dx ) ) );
+  matrix ddists;
+  initMat( &ddists, ptsAtOnce, KMAX );
+  checkErr( cudaMalloc( (void**)&ddists.mat, sizeOfMatB( ddists ) ) );
+  intMatrix dnns;
+  initIntMat( &dnns, ptsAtOnce, KMAX );
+  checkErr( cudaMalloc( (void**)&dnns.mat, sizeOfIntMatB( dnns ) ) );
+
+  // loop through the X, finding the NN for each.
+  unint numLeft = n;
+  unint row = 0;
+  unint pi, pip;
+  unint its = 0;
+  while( numLeft > 0 ){
+    pi = MIN( ptsAtOnce, numLeft );
+    pip = PAD( pi );
+    cudaMemcpy( dx.mat, &x.mat[IDX( row, 0, x.ld )], pi*x.pc*sizeof(*x.mat), cudaMemcpyHostToDevice );
+    dx.r = pi; dx.pr = pip;
+
+    //zero out extra rows of x.mat
+    if( pip-pi )
+      cudaMemcpy( &dx.mat[IDX( pi, 0, x.ld )], zeros.mat, (pip-pi)*x.pc*sizeof(*x.mat), cudaMemcpyHostToDevice );
+
+    knnWrap( dx, rbcS->dr, ddists, dnns );
+    cudaMemcpy( &nns.mat[IDX( row, 0, nns.ld )], dnns.mat, pi*KMAX*sizeof(unint), cudaMemcpyDeviceToHost );
+
+    numLeft -= pi;
+    row += pi;
+    printf("\t it %d finished; %d points left\n", its++, numLeft);
+  }
+  
+  cudaFree( dx.mat );
+  cudaFree( ddists.mat );
+  cudaFree( dnns.mat );
+  
+  rbcS->groupCount = (unint*)calloc( PAD(numReps), sizeof(*rbcS->groupCount) );
+  for( i=0; i<x.r; i++ )
+    for( j=0; j<ol; j++ )
+      rbcS->groupCount[ nns.mat[IDX( i, j, nns.ld )] ]++;
+  
+  unint maxCount = 0;
+  for( i=0; i<numReps; i++ )
+    maxCount = MAX( maxCount, rbcS->groupCount[i] );
+  printf("max count is %d \n", maxCount );
+  
+  initIntMat( &rbcS->dxMap, numReps, maxCount );
+  checkErr( cudaMalloc( (void**)&rbcS->dxMap, sizeOfIntMatB( rbcS->dxMap ) ) );
+  unint *pos = (unint*)calloc( numReps, sizeof(*pos) );
+  intMatrix xMap;
+  initIntMat( &xMap, numReps, maxCount );
+  xMap.mat = (unint*)calloc( sizeOfIntMat(xMap), sizeof(*xMap.mat));
+  for( i=0; i<x.r; i++ ){
+    for( j=0; j<ol; j++ ){
+      unint ind = nns.mat[IDX( i, j, nns.ld )];
+      xMap.mat[IDX( ind, pos[ind]++, xMap.ld )] = i;
+    }
+  }
+  cudaMemcpy( rbcS->dxMap.mat, xMap.mat, sizeOfIntMatB( xMap ), cudaMemcpyHostToDevice );
+  initMat( &rbcS->dx, x.r, x.c );
+  checkErr( cudaMalloc( (void**)&rbcS->dx, sizeOfMatB(rbcS->dx) ) );
+  cudaMemcpy( rbcS->dx.mat, x.mat, sizeOfMatB(x), cudaMemcpyHostToDevice );
+  
+  free( pos );
+  free( xMap.mat );
+  free( nns.mat );
+  free( dists.mat );
+  free( zeros.mat );
 }
   
 
@@ -162,7 +251,7 @@ void buildBigRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
     max_h.mat[i] = MAX_REAL;
 
   matrix zeros;
-  initMat( &zeros, BLOCK_SIZE, s );
+  initMat( &zeros, BLOCK_SIZE, x.c );
   zeros.mat = (real*)calloc( sizeOfMat(zeros), sizeof(*zeros.mat) );
 
   //assume all of x is in CPU RAM

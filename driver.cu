@@ -113,7 +113,9 @@ int main(int argc, char**argv){
   printf("building the rbc..\n");
   gettimeofday( &tvB, NULL );
   //buildRBC( x, &rbcS, numReps, numReps );
-  buildBigRBC( x, &rbcS, numReps, numReps );
+  //  buildBigRBC( x, &rbcS, numReps, numReps );
+  unint ol = (unint)(((double)numReps)*numReps/((double)n));
+  buildVor( x, &rbcS, numReps, ol );
   gettimeofday( &tvE, NULL );
   printf( "\t.. build time = %6.4f \n", timeDiff(tvB,tvE) );
   
