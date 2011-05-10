@@ -99,4 +99,11 @@ typedef struct {
   unint *groupCount;
 } rbcStruct;
 
+
+typedef struct {
+  matrix r;
+  intMatrix xMap;
+  unint *groupCount;
+} vorStruct;
+
 #endif
