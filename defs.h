@@ -17,8 +17,8 @@
 
 //The distance measure that is used.  This macro returns the 
 //distance for a single coordinate.
-#define DIST(i,j) ( fabs((i)-(j)) )  // L_1
-//#define DIST(i,j) ( ( (i)-(j) )*( (i)-(j) ) )  // L_2
+//#define DIST(i,j) ( fabs((i)-(j)) )  // L_1
+#define DIST(i,j) ( ( (i)-(j) )*( (i)-(j) ) )  // L_2
 
 // Format that the data is manipulated in:
 typedef float real;
