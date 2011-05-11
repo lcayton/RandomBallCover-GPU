@@ -1,4 +1,4 @@
-***Random Ball Cover (RBC) v0.2.4***
+ ***Random Ball Cover (RBC) v0.2.4***
 Lawrence Cayton
 lcayton@tuebingen.mpg.de
 
@@ -90,12 +90,12 @@ FILES
 ---------------------------------------------------------------------
 MISC NOTES ON THE CODE
 
-* The code currently computes distance using the L_1 (manhattan)
+* The code currently computes distance using the L_2 (Euclidean)
   metric.  If you wish to use a different notion of distance, you must
   modify defs.h.  It is quite simple to switch to any metric that 
   operates alongs the coordinates independently (eg, any L_p metric),
-  but more complex metrics will require some aditional work.  The L_2
-  metric (standard Euclidean distance) is already defined in defs.h.  
+  but more complex metrics will require some aditional work.  The L_1
+  metric (manhatten distance) is already defined in defs.h.  
 
 * The k-NN code is currently hard-coded for k=32.  It is hard-coded
   because it uses a manually implemented sorting network. This design
