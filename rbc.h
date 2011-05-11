@@ -10,10 +10,11 @@
 
 void buildRBC(const matrix,rbcStruct*,unint, unint);
 void buildBigRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s);
-void buildVor( const matrix x, rbcStruct *rbcS, unint numReps, unint ol);
+void buildVor( const matrix x, vorStruct *rbcS, unint numReps, unint ol);
 void queryRBC(const matrix,const rbcStruct,unint*,real*);
 void kqueryRBC(const matrix,const rbcStruct,intMatrix,matrix);
 void destroyRBC(rbcStruct*);
+void destroyVor(vorStruct *vorS);
 void distSubMat(matrix,matrix,matrix,unint,unint);
 void computeReps(matrix,matrix,unint*,real*);
 void computeRadii(unint*,real*,real*,unint,unint);
@@ -25,6 +26,6 @@ void initCompPlan(compPlan*,charMatrix,unint*,unint*,unint);
 void freeCompPlan(compPlan*);
 void computeNNs(matrix,intMatrix,matrix,unint*,compPlan,unint*,real*,unint);
 void computeKNNs(matrix,intMatrix,matrix,unint*,compPlan,intMatrix,matrix,unint);
-void setupReps(matrix,rbcStruct*,int);
-
+void setupReps(matrix,rbcStruct*,unint);
+void setupRepsVor(matrix,vorStruct*,unint);
 #endif

@@ -102,7 +102,7 @@ typedef struct {
 
 typedef struct {
   matrix r;
-  intMatrix xMap;
+  unint **xMap;
   unint *groupCount;
 } vorStruct;
 

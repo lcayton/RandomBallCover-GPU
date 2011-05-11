@@ -122,12 +122,13 @@ void kqueryRBC(const matrix q, const rbcStruct rbcS, intMatrix NNs, matrix NNdis
   free(groupCountQ);
 }
 
-void buildVor( const matrix x, rbcStruct *rbcS, unint numReps, unint ol){
+void buildVor( const matrix x, vorStruct *vorS, unint numReps, unint ol){
   ol = MIN( ol, 32 );
+  printf(" ol = %d \n", ol);
   unint i, j;
   unint n = x.pr;
   
-  setupReps( x, rbcS, numReps );
+  setupRepsVor( x, vorS, numReps );
 
   matrix dists;
   initMat( &dists, x.r, KMAX );
@@ -139,6 +140,11 @@ void buildVor( const matrix x, rbcStruct *rbcS, unint numReps, unint ol){
   matrix zeros;
   initMat( &zeros, BLOCK_SIZE, x.c );
   zeros.mat = (real*)calloc( sizeOfMat(zeros), sizeof(*zeros.mat) );
+
+  matrix dr;
+  initMat( &dr, numReps, x.c );
+  checkErr( cudaMalloc( (void**)&dr.mat, sizeOfMatB( dr ) ) );
+  cudaMemcpy( dr.mat, vorS->r.mat, sizeOfMatB(dr), cudaMemcpyHostToDevice );
 
   //assume all of x is in CPU RAM
   //see how much fits onto the GPU at once.
@@ -173,7 +179,7 @@ void buildVor( const matrix x, rbcStruct *rbcS, unint numReps, unint ol){
     if( pip-pi )
       cudaMemcpy( &dx.mat[IDX( pi, 0, x.ld )], zeros.mat, (pip-pi)*x.pc*sizeof(*x.mat), cudaMemcpyHostToDevice );
 
-    knnWrap( dx, rbcS->dr, ddists, dnns );
+    knnWrap( dx, dr, ddists, dnns );
     cudaMemcpy( &nns.mat[IDX( row, 0, nns.ld )], dnns.mat, pi*KMAX*sizeof(unint), cudaMemcpyDeviceToHost );
 
     numLeft -= pi;
@@ -184,36 +190,32 @@ void buildVor( const matrix x, rbcStruct *rbcS, unint numReps, unint ol){
   cudaFree( dx.mat );
   cudaFree( ddists.mat );
   cudaFree( dnns.mat );
-  
-  rbcS->groupCount = (unint*)calloc( PAD(numReps), sizeof(*rbcS->groupCount) );
+  cudaFree( dr.mat );
+
+  vorS->groupCount = (unint*)calloc( PAD(numReps), sizeof(*vorS->groupCount) );
   for( i=0; i<x.r; i++ )
     for( j=0; j<ol; j++ )
-      rbcS->groupCount[ nns.mat[IDX( i, j, nns.ld )] ]++;
+      vorS->groupCount[ nns.mat[IDX( i, j, nns.ld )] ]++;
   
   unint maxCount = 0;
   for( i=0; i<numReps; i++ )
-    maxCount = MAX( maxCount, rbcS->groupCount[i] );
+    maxCount = MAX( maxCount, vorS->groupCount[i] );
   printf("max count is %d \n", maxCount );
   
-  initIntMat( &rbcS->dxMap, numReps, maxCount );
-  checkErr( cudaMalloc( (void**)&rbcS->dxMap, sizeOfIntMatB( rbcS->dxMap ) ) );
+  vorS->xMap = (unint**)calloc( numReps, sizeof(unint*) );
+  for( i=0; i<numReps; i++ )
+    vorS->xMap[i] = (unint*)calloc( vorS->groupCount[i], sizeof(unint) );
+  
   unint *pos = (unint*)calloc( numReps, sizeof(*pos) );
-  intMatrix xMap;
-  initIntMat( &xMap, numReps, maxCount );
-  xMap.mat = (unint*)calloc( sizeOfIntMat(xMap), sizeof(*xMap.mat));
+  
   for( i=0; i<x.r; i++ ){
     for( j=0; j<ol; j++ ){
       unint ind = nns.mat[IDX( i, j, nns.ld )];
-      xMap.mat[IDX( ind, pos[ind]++, xMap.ld )] = i;
+      vorS->xMap[ind][pos[ind]++] = i;
     }
   }
-  cudaMemcpy( rbcS->dxMap.mat, xMap.mat, sizeOfIntMatB( xMap ), cudaMemcpyHostToDevice );
-  initMat( &rbcS->dx, x.r, x.c );
-  checkErr( cudaMalloc( (void**)&rbcS->dx, sizeOfMatB(rbcS->dx) ) );
-  cudaMemcpy( rbcS->dx.mat, x.mat, sizeOfMatB(x), cudaMemcpyHostToDevice );
   
   free( pos );
-  free( xMap.mat );
   free( nns.mat );
   free( dists.mat );
   free( zeros.mat );
@@ -409,7 +411,7 @@ void buildRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
 
 
 // Choose representatives and move them to device
-void setupReps(matrix x, rbcStruct *rbcS, int numReps){
+void setupReps(matrix x, rbcStruct *rbcS, unint numReps){
   unint i;
   unint *randInds;
   randInds = (unint*)calloc( PAD(numReps), sizeof(*randInds) );
@@ -427,6 +429,25 @@ void setupReps(matrix x, rbcStruct *rbcS, int numReps){
   free(randInds);
   free(r.mat);
 }
+
+
+// Choose representatives and move them to device
+void setupRepsVor(matrix x, vorStruct *vorS, unint numReps){
+  unint i;
+  unint *randInds;
+  randInds = (unint*)calloc( PAD(numReps), sizeof(*randInds) );
+  subRandPerm(numReps, x.r, randInds);
+  
+  initMat( &vorS->r, numReps, x.c );
+  vorS->r.mat = (real*)calloc( sizeOfMat(vorS->r), sizeof(*(vorS->r.mat)) );
+
+  for(i=0;i<numReps;i++)
+    copyVector(&vorS->r.mat[IDX(i,0,vorS->r.ld)], &x.mat[IDX(randInds[i],0,x.ld)], x.c);
+  
+  free(randInds);
+
+}
+
 
 
 //Assign each point in dq to its nearest point in dr.  
@@ -565,6 +586,16 @@ void destroyRBC(rbcStruct *rbcS){
   cudaFree(rbcS->dxMap.mat);
   cudaFree(rbcS->dr.mat);
   free(rbcS->groupCount);
+}
+
+
+void destroyVor(vorStruct *vorS){
+  unint i;
+  for( i=0; i<vorS->r.r; i++ )
+    free( vorS->xMap[i] );
+  free( vorS->xMap );
+  free( vorS->r.mat );
+  free( vorS->groupCount );
 }
 
 

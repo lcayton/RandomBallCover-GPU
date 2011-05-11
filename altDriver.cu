@@ -20,7 +20,7 @@ void parseInput(int,char**);
 void readData(char*,matrix);
 void readDataText(char*,matrix);
 void evalNNerror(matrix, matrix, unint*);
-void evalKNNerror(matrix,matrix,intMatrix);
+void evalKNNerror(matrix,matrix,unint*,vorStruct);
 void writeNeighbs(char*,char*,intMatrix,matrix);
 
 char *dataFileX, *dataFileQ, *dataFileXtxt, *dataFileQtxt, *outFile, *outFiletxt, *nnFile;
@@ -33,7 +33,7 @@ int main(int argc, char**argv){
   matrix distsRBC;
   struct timeval tvB,tvE;
   cudaError_t cE;
-  rbcStruct rbcS;
+  vorStruct vorS;
 
   printf("*****************\n");
   printf("RANDOM BALL COVER\n");
@@ -54,37 +54,6 @@ int main(int argc, char**argv){
   gettimeofday( &tvE, NULL );
   printf(" init time: %6.2f \n", timeDiff( tvB, tvE ) );
   
-  /* unint zlen = 2048; */
-  /* unint hlen = 32; */
-  /* real *z = (real*)calloc( zlen, sizeof(*z) ); */
-  /* real *h = (real*)calloc( hlen, sizeof(*h) ); */
-  /* real *dz, *dh; */
-  /* cudaMalloc( (void**)&dz, zlen*sizeof(*dz) ); */
-  /* cudaMalloc( (void**)&dh, hlen*sizeof(*h) ); */
-  /* unint i; */
-  /* srand((unsigned int)tvE.tv_usec); */
-  /* for( i=0; i<zlen; i++ ){ */
-  /*   do */
-  /*     z[i] = rand(); */
-  /*   while (z[i] > 100000); */
-  /* } */
-  /* for(i=0; i<hlen; i++) */
-  /*   h[i] = MAX_REAL; */
-  /* cudaMemcpy( dz, z, zlen*sizeof(*dz), cudaMemcpyHostToDevice ); */
-  /* cudaMemcpy( dh, h, hlen*sizeof(*h), cudaMemcpyHostToDevice ); */
-  /* dim3 block(16,1); */
-  /* dim3 grid(1,1); */
-  /* heapSort<<<grid,block>>>( dz, dh, zlen, hlen ); */
-  
-  /* cudaMemcpy( h, dh, hlen*sizeof(*h), cudaMemcpyDeviceToHost ); */
-  /* for( i=0; i<hlen-1; i++ ){ */
-  /*   printf("%6.2f ", h[i]);  */
-  /*   if( h[i] > h[i+1] ) */
-  /*     printf("error\n"); */
-  /* } */
-  /* printf("\n"); */
-  /* return; */
-
   //Setup matrices
   initMat( &x, n, d );
   initMat( &q, m, d );
@@ -103,44 +72,47 @@ int main(int argc, char**argv){
     readData( dataFileQ, q );
   
   //Allocate space for NNs and dists
-  initIntMat( &nnsRBC, m, KMAX );  //KMAX is defined in defs.h
-  initMat( &distsRBC, m, KMAX );
-  nnsRBC.mat = (unint*)calloc( sizeOfIntMat(nnsRBC), sizeof(*nnsRBC.mat) );
-  distsRBC.mat = (real*)calloc( sizeOfMat(distsRBC), sizeof(*distsRBC.mat) );
+  /* initIntMat( &nnsRBC, m, KMAX );  //KMAX is defined in defs.h */
+  /* initMat( &distsRBC, m, KMAX ); */
+  /* nnsRBC.mat = (unint*)calloc( sizeOfIntMat(nnsRBC), sizeof(*nnsRBC.mat) ); */
+  /* distsRBC.mat = (real*)calloc( sizeOfMat(distsRBC), sizeof(*distsRBC.mat) ); */
+
+  unint *nrs = (unint*)calloc( PAD(m), sizeof(*nrs));
+  
 
   //Build the RBC
   printf("building the rbc..\n");
   gettimeofday( &tvB, NULL );
   unint ol = (unint)(((double)numReps)*numReps/((double)n));
-  buildVor( x, &rbcS, numReps, ol );
+  buildVor( x, &vorS, numReps, ol );
   gettimeofday( &tvE, NULL );
   printf( "\t.. build time = %6.4f \n", timeDiff(tvB,tvE) );
   
   gettimeofday( &tvB, NULL );
-  kqueryRBC( q, rbcS, nnsRBC, distsRBC );
-  //bruteK( q, r, nnsRBC, distsRBC );
+  //  kqueryRBC( q, rbcS, nnsRBC, distsRBC );
+  //bruteK( q, vorS.r, nnsRBC, distsRBC );
+  bruteSearch( vorS.r, q,  nrs );
   gettimeofday( &tvE, NULL );
   printf( "\t.. query time for krbc = %6.4f \n", timeDiff(tvB,tvE) );
   
-  destroyRBC( &rbcS );
-
   //EVAL PHASE
-  
-
   cE = cudaGetLastError();
   if( cE != cudaSuccess ){
     printf("Execution failed; error type: %s \n", cudaGetErrorString(cE) );
   }
   
   if( runEval )
-    evalKNNerror(x,q,nnsRBC);
+    evalKNNerror(x,q,nrs,vorS);
   
-  if( outFile || outFiletxt )
-    writeNeighbs( outFile, outFiletxt, nnsRBC, distsRBC );
+  destroyVor( &vorS );
+  
+  /* if( outFile || outFiletxt ) */
+  /*   writeNeighbs( outFile, outFiletxt, nnsRBC, distsRBC ); */
 
   cudaThreadExit();
-  free( nnsRBC.mat );
-  free( distsRBC.mat );
+  /* free( nnsRBC.mat ); */
+  /* free( distsRBC.mat ); */
+  free( nrs );
   free( x.mat );
   free( q.mat );
 }
@@ -310,7 +282,7 @@ void evalNNerror(matrix x, matrix q, unint *NNs){
 
 
 //evals the error rate of k-nns
-void evalKNNerror(matrix x, matrix q, intMatrix NNs){
+void evalKNNerror(matrix x, matrix q, unint *NNs, vorStruct vorS){
   unint i,j,k;
 
   unint m = q.r;
@@ -325,19 +297,24 @@ void evalKNNerror(matrix x, matrix q, intMatrix NNs){
   fclose( fp );
 
   unint *ol = (unint*)calloc( q.r, sizeof(*ol) );
-  
+  unint *tol = (unint*)calloc( q.r, sizeof(*tol) );  
+
    //calc overlap
   for(i=0; i<m; i++){
-    for(j=0; j<KMAX; j++){
+    //get rep:
+    unint ri = NNs[i];
+    tol[i] = vorS.groupCount[ri];
+    for(j=0; j<vorS.groupCount[ri]; j++){
       for(k=0; k<KMAX; k++){
-	ol[i] += ( NNs.mat[IDX(i, j, NNs.ld)] == trueNNs[IDX(i, k, 32)] );
+	ol[i] += ( vorS.xMap[ri][j] == trueNNs[IDX(i, k, 32)] );
       }
     }
   }
 
-  long int nc=0;
+  long unsigned int nc=0, tnc=0;
   for(i=0;i<m;i++){
     nc += ol[i];
+    tnc += tol[i];
   }
 
   double mean = ((double)nc)/((double)m);
@@ -346,8 +323,15 @@ void evalKNNerror(matrix x, matrix q, intMatrix NNs){
     var += (((double)ol[i])-mean)*(((double)ol[i])-mean)/((double)m);
   }
   printf("\tavg overlap = %6.4f/%d; std dev = %6.4f \n", mean, KMAX, sqrt(var));
-
-
+  
+  mean = ((double)tnc)/((double)m);
+  var = 0.0;
+  for(i=0;i<m;i++) {
+    var += (((double)tol[i])-mean)*(((double)tol[i])-mean)/((double)m);
+  }
+  printf("\tnum dists = %6.4f/%d; std dev = %6.4f \n", mean, KMAX, sqrt(var));
+  
+  free(tol);
   free(ol);
 }
 
