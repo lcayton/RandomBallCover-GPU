@@ -20,7 +20,7 @@ void parseInput(int,char**);
 void readData(char*,matrix);
 void readDataText(char*,matrix);
 void evalNNerror(matrix, matrix, unint*);
-void evalKNNerror(matrix,matrix,unint*,vorStruct);
+void evalKNNerror(matrix,unint*,vorStruct);
 void writeNeighbs(char*,char*,intMatrix,matrix);
 
 char *dataFileX, *dataFileQ, *dataFileXtxt, *dataFileQtxt, *outFile, *outFiletxt, *nnFile;
@@ -55,42 +55,36 @@ int main(int argc, char**argv){
   printf(" init time: %6.2f \n", timeDiff( tvB, tvE ) );
   
   //Setup matrices
-  initMat( &x, n, d );
   initMat( &q, m, d );
-  x.mat = (real*)calloc( sizeOfMat(x), sizeof(*(x.mat)) );
   q.mat = (real*)calloc( sizeOfMat(q), sizeof(*(q.mat)) );
   
   
-  //Load data 
-  if( dataFileXtxt )
-    readDataText( dataFileXtxt, x );
-  else
-    readData( dataFileX, x );
   if( dataFileQtxt )
     readDataText( dataFileQtxt, q );
   else
     readData( dataFileQ, q );
-  
-  //Allocate space for NNs and dists
-  /* initIntMat( &nnsRBC, m, KMAX );  //KMAX is defined in defs.h */
-  /* initMat( &distsRBC, m, KMAX ); */
-  /* nnsRBC.mat = (unint*)calloc( sizeOfIntMat(nnsRBC), sizeof(*nnsRBC.mat) ); */
-  /* distsRBC.mat = (real*)calloc( sizeOfMat(distsRBC), sizeof(*distsRBC.mat) ); */
 
   unint *nrs = (unint*)calloc( PAD(m), sizeof(*nrs));
   
 
-  //Build the RBC
-  printf("building the rbc..\n");
+  //Try the alternative method out
+  hdMatrix hdx;
+  hdx.fp = fopen(dataFileX, "rb");
+  if( !hdx.fp ){
+    fprintf(stderr,"error opening input file\n");
+    exit(1);
+  }
+  hdx.r = n;
+  hdx.c = d;
+
+  printf("[alt]building the rbc..\n");
   gettimeofday( &tvB, NULL );
   unint ol = (unint)(((double)numReps)*numReps/((double)n));
-  buildVor( x, &vorS, numReps, ol );
+  buildVorBig( hdx, &vorS, numReps, ol );
   gettimeofday( &tvE, NULL );
   printf( "\t.. build time = %6.4f \n", timeDiff(tvB,tvE) );
-  
+
   gettimeofday( &tvB, NULL );
-  //  kqueryRBC( q, rbcS, nnsRBC, distsRBC );
-  //bruteK( q, vorS.r, nnsRBC, distsRBC );
   bruteSearch( vorS.r, q,  nrs );
   gettimeofday( &tvE, NULL );
   printf( "\t.. query time for krbc = %6.4f \n", timeDiff(tvB,tvE) );
@@ -102,18 +96,14 @@ int main(int argc, char**argv){
   }
   
   if( runEval )
-    evalKNNerror(x,q,nrs,vorS);
+    evalKNNerror(q,nrs,vorS);
   
   destroyVor( &vorS );
-  
-  /* if( outFile || outFiletxt ) */
-  /*   writeNeighbs( outFile, outFiletxt, nnsRBC, distsRBC ); */
+  fclose( hdx.fp );
 
   cudaThreadExit();
-  /* free( nnsRBC.mat ); */
-  /* free( distsRBC.mat ); */
+
   free( nrs );
-  free( x.mat );
   free( q.mat );
 }
 
@@ -282,7 +272,7 @@ void evalNNerror(matrix x, matrix q, unint *NNs){
 
 
 //evals the error rate of k-nns
-void evalKNNerror(matrix x, matrix q, unint *NNs, vorStruct vorS){
+void evalKNNerror(matrix q, unint *NNs, vorStruct vorS){
   unint i,j,k;
 
   unint m = q.r;

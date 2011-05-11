@@ -26,4 +26,5 @@ size_t sizeOfMatB(matrix);
 size_t sizeOfIntMatB(intMatrix);
 size_t sizeOfMat(matrix);
 size_t sizeOfIntMat(intMatrix);
+void readBlock(matrix,unint,hdMatrix,unint,unint);
 #endif

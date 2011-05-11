@@ -222,6 +222,116 @@ void buildVor( const matrix x, vorStruct *vorS, unint numReps, unint ol){
 }
   
 
+//out-of-memory version of buildVor
+void buildVorBig( const hdMatrix x, vorStruct *vorS, unint numReps, unint ol){
+  ol = MIN( ol, 32 );
+  printf(" ol = %d \n", ol);
+  unint i, j;
+  unint n = PAD(x.r);
+  
+  setupRepsVorHD( x, vorS, numReps );
+
+  matrix dists;
+  initMat( &dists, x.r, KMAX );
+  dists.mat = (real*)calloc( sizeOfMat(dists), sizeof(dists.mat) );
+  intMatrix nns; 
+  initIntMat( &nns, x.r, KMAX );
+  nns.mat = (unint*)calloc( sizeOfIntMat(nns), sizeof(nns.mat) );
+
+  matrix zeros;
+  initMat( &zeros, BLOCK_SIZE, x.c );
+  zeros.mat = (real*)calloc( sizeOfMat(zeros), sizeof(*zeros.mat) );
+
+  matrix dr;
+  initMat( &dr, numReps, x.c );
+  checkErr( cudaMalloc( (void**)&dr.mat, sizeOfMatB( dr ) ) );
+  cudaMemcpy( dr.mat, vorS->r.mat, sizeOfMatB(dr), cudaMemcpyHostToDevice );
+
+  //assume all of x is in CPU RAM
+  //see how much fits onto the GPU at once.
+  size_t memFree, memTot;
+  cudaMemGetInfo(&memFree, &memTot);
+  memFree = (size_t)(((double)memFree)*MEM_USABLE);
+  unint memPerPt = PAD(x.c)*sizeof(real) + KMAX*sizeof(real) + KMAX*sizeof(unint);
+  unint ptsAtOnce = MIN( DPAD(memFree/memPerPt), n );
+  printf("ptsAtOnce = %d \n", ptsAtOnce);
+
+  //for now, load from hd to mem to gpu mem.
+  matrix xmem;
+  initMat( &xmem, ptsAtOnce, x.c );
+  xmem.mat = (real*)calloc( sizeOfMat(xmem), sizeof(*xmem.mat) );
+
+  matrix dx;
+  initMat( &dx, ptsAtOnce, x.c );
+  checkErr( cudaMalloc( (void**)&dx.mat, sizeOfMatB( dx ) ) );
+  matrix ddists;
+  initMat( &ddists, ptsAtOnce, KMAX );
+  checkErr( cudaMalloc( (void**)&ddists.mat, sizeOfMatB( ddists ) ) );
+  intMatrix dnns;
+  initIntMat( &dnns, ptsAtOnce, KMAX );
+  checkErr( cudaMalloc( (void**)&dnns.mat, sizeOfIntMatB( dnns ) ) );
+
+  // loop through the X, finding the NN for each.
+  unint numLeft = n;
+  unint row = 0;
+  unint pi, pip;
+  unint its = 0;
+  printf("starting loop...\n");
+  while( numLeft > 0 ){
+    pi = MIN( ptsAtOnce, numLeft );
+    pip = PAD( pi );
+
+    readBlock( xmem, 0, x, row, pi );
+    cudaMemcpy( dx.mat, xmem.mat, pi*xmem.pc*sizeof(*xmem.mat), cudaMemcpyHostToDevice );
+    dx.r = pi; dx.pr = pip;
+
+    //zero out extra rows of x.mat
+    if( pip-pi )
+      cudaMemcpy( &dx.mat[IDX( pi, 0, dx.ld )], zeros.mat, (pip-pi)*dx.pc*sizeof(*zeros.mat), cudaMemcpyHostToDevice );
+
+    knnWrap( dx, dr, ddists, dnns );
+    cudaMemcpy( &nns.mat[IDX( row, 0, nns.ld )], dnns.mat, pi*KMAX*sizeof(unint), cudaMemcpyDeviceToHost );
+
+    numLeft -= pi;
+    row += pi;
+    printf("\t it %d finished; %d points left\n", its++, numLeft);
+  }
+  
+  cudaFree( dx.mat );
+  cudaFree( ddists.mat );
+  cudaFree( dnns.mat );
+  cudaFree( dr.mat );
+
+  vorS->groupCount = (unint*)calloc( PAD(numReps), sizeof(*vorS->groupCount) );
+  for( i=0; i<x.r; i++ )
+    for( j=0; j<ol; j++ )
+      vorS->groupCount[ nns.mat[IDX( i, j, nns.ld )] ]++;
+  
+  unint maxCount = 0;
+  for( i=0; i<numReps; i++ )
+    maxCount = MAX( maxCount, vorS->groupCount[i] );
+  printf("max count is %d \n", maxCount );
+  
+  vorS->xMap = (unint**)calloc( numReps, sizeof(unint*) );
+  for( i=0; i<numReps; i++ )
+    vorS->xMap[i] = (unint*)calloc( vorS->groupCount[i], sizeof(unint) );
+  
+  unint *pos = (unint*)calloc( numReps, sizeof(*pos) );
+  
+  for( i=0; i<x.r; i++ ){
+    for( j=0; j<ol; j++ ){
+      unint ind = nns.mat[IDX( i, j, nns.ld )];
+      vorS->xMap[ind][pos[ind]++] = i;
+    }
+  }
+
+  free( xmem.mat );
+  free( pos );
+  free( nns.mat );
+  free( dists.mat );
+  free( zeros.mat );
+}
+
 
 #define RPI 1024 //reps per it
 //s needs to be a multiple of 32, numReps a multiple of RPI
@@ -446,6 +556,25 @@ void setupRepsVor(matrix x, vorStruct *vorS, unint numReps){
   
   free(randInds);
 
+}
+
+
+
+// Choose representatives and move them to device
+//  x is on the HD.
+void setupRepsVorHD(hdMatrix x, vorStruct *vorS, unint numReps){
+  unint i;
+  unint *randInds;
+  randInds = (unint*)calloc( PAD(numReps), sizeof(*randInds) );
+  subRandPerm(numReps, x.r, randInds);
+  
+  initMat( &vorS->r, numReps, x.c );
+  vorS->r.mat = (real*)calloc( sizeOfMat(vorS->r), sizeof(*(vorS->r.mat)) );
+  
+  for(i=0;i<numReps;i++)
+    readBlock( vorS->r, i, x, randInds[i], 1 );
+
+  free(randInds);
 }
 
 

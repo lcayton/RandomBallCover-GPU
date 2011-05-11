@@ -194,6 +194,21 @@ double timeDiff(struct timeval start, struct timeval end){
   return (double)(end.tv_sec+end.tv_usec/1e6 - start.tv_sec - start.tv_usec/1e6); 
 }
 
+//reads num rows from x, starting at row.  place them
+//in xmem, starting at rowOff
+void readBlock( matrix xmem, unint rowOff, hdMatrix x, unint row, unint num ){
+  long offset = ((long)row)*x.c*sizeof(real);
+  fseek( x.fp, offset, SEEK_SET );
+
+  unint i;
+  for( i=0; i<num; i++ ){
+    if( xmem.c != fread( &xmem.mat[IDX( rowOff+i, 0, xmem.ld )], sizeof(real), xmem.c, x.fp )){
+      fprintf( stderr, "error reading block\n");
+      exit(1);
+    }
+  }
+}
+  
 
 
 #endif

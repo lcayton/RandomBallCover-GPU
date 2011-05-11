@@ -3,6 +3,7 @@
 
 #include<float.h>
 #include<stdint.h>
+#include<stdio.h>
 
 #define FLOAT_TOL 1e-7
 
@@ -106,4 +107,10 @@ typedef struct {
   unint *groupCount;
 } vorStruct;
 
+
+typedef struct {
+  unint r;
+  unint c;
+  FILE *fp;
+} hdMatrix;
 #endif
