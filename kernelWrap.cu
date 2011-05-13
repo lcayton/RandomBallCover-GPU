@@ -181,4 +181,49 @@ void nnHeapWrap(const matrix dq, const matrix dx, matrix dh, intMatrix dhi){
   cudaThreadSynchronize();
 
 }
+
+
+void setConstantWrap( matrix dx, real z ){
+  dim3 block(BLOCK_SIZE,BLOCK_SIZE);
+  dim3 grid;
+  unint numDone, todo;
+  
+  grid.x = 1;
+  
+  numDone = 0;
+  while( numDone < dx.pr ){
+    todo = MIN( dx.pr, MAX_BS*BLOCK_SIZE );
+    grid.y = todo/BLOCK_SIZE;
+    setConstantKernel<<<grid,block>>>(dx,numDone,z);
+    numDone += todo;
+  }
+    cudaThreadSynchronize();
+
+}
+
+// Computes distances between dr and dx, stores results in dD, starting in 
+// column colOff.  Stores the corresponding indices of dx in dI, starting
+// from index indOff.
+void offDistWrap( const matrix dr, const matrix dx, matrix dD, intMatrix dI, unint colOff, unint indOff ){
+  dim3 block(BLOCK_SIZE,BLOCK_SIZE);
+  dim3 grid;
+  
+  unint todoX, todoY, numDoneX, numDoneY;
+
+  numDoneX = 0;
+  while ( numDoneX < dx.pr ){
+    todoX = MIN( dx.pr - numDoneX, MAX_BS*BLOCK_SIZE );
+    grid.x = todoX/BLOCK_SIZE;
+    numDoneY = 0;
+    while( numDoneY < dr.pr ){
+      todoY = MIN( dr.pr - numDoneY, MAX_BS*BLOCK_SIZE );
+      grid.y = todoY/BLOCK_SIZE;
+      offDistKernel<<<grid,block>>>(dr, numDoneY, dx, numDoneX, dD, dI, colOff, indOff);
+      numDoneY += todoY;
+    }
+    numDoneX += todoX;
+  }
+
+  cudaThreadSynchronize();
+}
 #endif

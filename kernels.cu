@@ -696,8 +696,43 @@ __global__ void nnHeapKernel(const matrix Q, unint numDone, const matrix X, matr
     
     heapInsert( dNN, idNN, dh, dhi, qB );
   }
-  
-  
 }
 
+
+__global__ void setConstantKernel( matrix dx, unint numDone, real z ){
+  unint tx = threadIdx.x;
+  unint ty = blockIdx.y*BLOCK_SIZE + threadIdx.y;
+
+  unint i;
+  for( i=0; i<dx.pc; i+=BLOCK_SIZE )
+    dx.mat[IDX( ty, i+tx, dx.ld )] = z;
+}
+
+
+__global__ void offDistKernel( const matrix dr, unint rStart, const matrix dx, unint xStart, matrix dD, intMatrix dI, unint colOff, unint indOff ){
+  unint i, j;
+  unint tx = threadIdx.x;
+  unint bx = blockIdx.x*BLOCK_SIZE + xStart;
+  unint tr = threadIdx.y;
+  unint br = blockIdx.y*BLOCK_SIZE + rStart;
+
+  __shared__ real rs[BLOCK_SIZE][BLOCK_SIZE];
+  __shared__ real xs[BLOCK_SIZE][BLOCK_SIZE];
+
+  real ans=0;
+
+  for( i=0; i<dr.pc; i+=BLOCK_SIZE ){
+    rs[tx][tr] = dr.mat[IDX( br+tr, i+tx, dr.ld )];
+    xs[tx][tr] = dx.mat[IDX( bx+tr, i+tx, dx.ld )];
+    __syncthreads();
+    
+    for( j=0; j<BLOCK_SIZE; j++ )
+      ans += DIST( rs[j][tr], xs[j][tx] );
+
+    __syncthreads();
+  }
+
+  dD.mat[IDX( br+tr, colOff+bx+tx, dD.ld )] = ans;
+  dI.mat[IDX( br+tr, colOff+bx+tx, dI.ld )] = bx+tx+indOff;
+}
 #endif

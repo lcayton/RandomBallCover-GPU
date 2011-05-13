@@ -15,6 +15,8 @@
 #include "kernels.h"
 #include "kernelWrap.h"
 #include "sKernelWrap.h"
+#include <thrust/sort.h>
+#include <thrust/device_ptr.h>
 
 void queryRBC(const matrix q, const rbcStruct rbcS, unint *NNs, real* NNdists){
   unint m = q.r;
@@ -436,6 +438,102 @@ void buildBigRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
   free( max_h.mat );
 }
 
+#define RPI 1024 //reps per it
+//s needs to be a multiple of 32, numReps a multiple of RPI
+void buildBigOneShot( const hdMatrix x, vorStruct *vorS, unint numReps, unint s){
+  unint i,j;
+  unint n = x.r; 
+
+  setupRepsVorHD( x, vorS, numReps );
+
+  vorS->xMap = (unint**)calloc( numReps, sizeof(unint*) );
+  for( i=0; i<numReps; i++ )
+    vorS->xMap[i] = (unint*)calloc( s, sizeof(unint) );
+  vorS->groupCount = (unint*)calloc( PAD(numReps), sizeof(*vorS->groupCount) );
+  for( i=0; i<numReps; i++ )
+    vorS->groupCount[i] = PAD(s);
+
+  matrix dr;
+  initMat( &dr, RPI, x.c );
+  checkErr( cudaMalloc( (void**)&dr.mat, sizeOfMatB(dr) ) );
+
+  matrix zeros;
+  initMat( &zeros, BLOCK_SIZE, x.c );
+  zeros.mat = (real*)calloc( sizeOfMat(zeros), sizeof(*zeros.mat) );
+
+  //assume all of x is in CPU RAM
+  //see how much fits onto the GPU at once.
+  size_t memFree, memTot;
+  cudaMemGetInfo(&memFree, &memTot);
+  memFree = (size_t)(((double)memFree)*MEM_USABLE);
+  memFree -= RPI*s*(sizeof(unint)+sizeof(real)); //"heap"
+  unint memPerPt = PAD(x.c)*sizeof(real) + RPI*(sizeof(real)+sizeof(unint));
+  unint ptsAtOnce = MIN( DPAD(memFree/memPerPt), n );
+  
+  printf(" mem free for x = %6.2f, ptsAtOnce = %u \n", ((double)memFree)/(1024.0*1024.0), ptsAtOnce);
+  //allocate the temp dx which is on the device.
+  matrix dx;
+  initMat( &dx, ptsAtOnce, x.c );
+  checkErr( cudaMalloc( (void**)&dx.mat, sizeOfMatB( dx ) ) );
+
+  //allocate the dist matrix
+  matrix dD;
+  intMatrix dI; 
+  initMat( &dD, RPI, ptsAtOnce+s );
+  initIntMat( &dI, RPI, ptsAtOnce+s );
+  checkErr( cudaMalloc( (void**)&dD.mat, sizeOfMatB( dD ) ) );
+  checkErr( cudaMalloc( (void**)&dI.mat, sizeOfIntMatB( dI ) ) );
+
+  //matrix in main memory for x
+  matrix xmem;
+  initMat( &xmem, ptsAtOnce, x.c );
+  xmem.mat = (real*)calloc( sizeOfMat(xmem), sizeof(*xmem.mat) );
+
+  for( i=0; i<numReps/RPI; i++ ){
+    printf(" iterating through reps %d / %d \n", i, numReps/RPI );
+    //copy the appropriate rows into dr
+    cudaMemcpy( dr.mat, &vorS->r.mat[IDX( i*RPI, 0, vorS->r.ld )], sizeOfMatB( dr ), cudaMemcpyHostToDevice );
+    //init D to MAX_REALs
+    setConstantWrap( dD, MAX_REAL );
+
+    unint numLeft = n;
+    unint row = 0; //current row of x
+    unint pi, pip;
+    unint its=0;
+    while( numLeft > 0 ){
+      pi = MIN( ptsAtOnce, numLeft );
+      pip = PAD( pi );
+      
+      readBlock(xmem, 0, x, row, pi);
+      cudaMemcpy( dx.mat, xmem.mat, pi*xmem.pc*sizeof(*xmem.mat), cudaMemcpyHostToDevice );
+      dx.r = pi; dx.pr = pip;
+      
+      if( pip-pi )
+	cudaMemcpy( &dx.mat[IDX( pi, 0, dx.ld )], zeros.mat, (pip-pi)*dx.pc*sizeof(*zeros.mat), cudaMemcpyHostToDevice );
+
+      //compute distances between dr and dx.  store them starting in column s.
+      //store the indices of the xs in dI, starting from row.
+      offDistWrap( dr, dx, dD, dI, s, row );
+
+      sortDists( dD, dI );
+    
+      numLeft -= pi;
+      row += pi;
+      printf("\t it %d finished; %d points left\n", its++, numLeft); 
+    }
+    
+    for( j=0; j<RPI; j++ )
+      cudaMemcpy( vorS->xMap[i*RPI+j], &dI.mat[IDX( j, 0, dI.ld )], s*sizeof(unint), cudaMemcpyDeviceToHost );
+  }
+  
+  free( zeros.mat );
+  cudaFree( dr.mat );
+  free( xmem.mat );
+  cudaFree( dx.mat );
+  cudaFree( dD.mat );
+  cudaFree( dI.mat );
+}
+
 
 void buildRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
   unint n = x.pr;
@@ -799,4 +897,17 @@ void freeCompPlan(compPlan *dcP){
   cudaFree(dcP->qGroupToXGroup);
 }
 
+
+//sorts every row of dD with indices in dI 
+void sortDists( matrix dD, intMatrix dI ){
+  unint i;
+  
+  for( i=0; i<dD.r; i++ ){
+    thrust::device_ptr<float> dPtr( &dD.mat[IDX( i, 0, dD.ld )] );
+    thrust::device_ptr<unint> iPtr( &dI.mat[IDX( i, 0, dI.ld )] );
+  
+    thrust::sort_by_key( dPtr, dPtr+dD.c, iPtr);
+  }
+
+}
 #endif

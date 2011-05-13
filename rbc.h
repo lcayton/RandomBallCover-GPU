@@ -12,6 +12,7 @@ void buildRBC(const matrix,rbcStruct*,unint, unint);
 void buildBigRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s);
 void buildVor( const matrix x, vorStruct *rbcS, unint numReps, unint ol);
 void buildVorBig( const hdMatrix x, vorStruct *vorS, unint numReps, unint ol);
+void buildBigOneShot( const hdMatrix x, vorStruct *vorS, unint numReps, unint s);
 void queryRBC(const matrix,const rbcStruct,unint*,real*);
 void kqueryRBC(const matrix,const rbcStruct,intMatrix,matrix);
 void destroyRBC(rbcStruct*);
@@ -30,4 +31,6 @@ void computeKNNs(matrix,intMatrix,matrix,unint*,compPlan,intMatrix,matrix,unint)
 void setupReps(matrix,rbcStruct*,unint);
 void setupRepsVor(matrix,vorStruct*,unint);
 void setupRepsVorHD(hdMatrix x, vorStruct *vorS, unint numReps);
+
+void sortDists( matrix dD, intMatrix dI );
 #endif

@@ -20,4 +20,6 @@ __device__ void merge32x16(real[][48],unint[][48]);
 __device__ void mmGateI(real*,real*,unint*,unint*);
 __device__ void heapInsert(real x[][16], unint xi[][16], matrix h, intMatrix hi, unint rowOff);
 __global__ void nnHeapKernel(const matrix Q, unint numDone, const matrix X, matrix dh, intMatrix dhi);
+__global__ void setConstantKernel( matrix dx, unint numDone, real z );
+__global__ void offDistKernel( const matrix dr, unint rStart, const matrix dx, unint xStart, matrix dD, intMatrix dI, unint colOff, unint indOff );
 #endif

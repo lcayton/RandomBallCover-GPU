@@ -79,8 +79,9 @@ int main(int argc, char**argv){
 
   printf("[alt]building the rbc..\n");
   gettimeofday( &tvB, NULL );
-  unint ol = (unint)(((double)numReps)*numReps/((double)n));
-  buildVorBig( hdx, &vorS, numReps, ol );
+  //unint ol = (unint)(((double)numReps)*numReps/((double)n));
+  buildBigOneShot( hdx, &vorS, numReps, numReps);
+  //  buildVorBig( hdx, &vorS, numReps, ol );
   gettimeofday( &tvE, NULL );
   printf( "\t.. build time = %6.4f \n", timeDiff(tvB,tvE) );
 
