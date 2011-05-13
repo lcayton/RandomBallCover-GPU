@@ -227,7 +227,7 @@ void buildVorBig( const hdMatrix x, vorStruct *vorS, unint numReps, unint ol){
   ol = MIN( ol, 32 );
   printf(" ol = %d \n", ol);
   unint i, j;
-  unint n = PAD(x.r);
+  unint n = x.r; 
   
   setupRepsVorHD( x, vorS, numReps );
 
