@@ -272,7 +272,7 @@ void evalNNerror(matrix x, matrix q, unint *NNs){
 
 //evals the error rate of k-nns
 void evalKNNerror(matrix q, unint *NNs, vorStruct vorS){
-  unint i,j,k;
+  unint i,j,k,l;
 
   unint m = q.r;
   printf("\nComputing error rates (this might take a while)\n");
@@ -285,49 +285,72 @@ void evalKNNerror(matrix q, unint *NNs, vorStruct vorS){
   }
   fclose( fp );
 
-  unint *ol = (unint*)calloc( q.r, sizeof(*ol) );
-  unint *tol = (unint*)calloc( q.r, sizeof(*tol) );  
+  unint **patk = (unint**)calloc( q.r, sizeof(unint*) );
+  for( i=0; i<q.r; i++ )
+    patk[i] = (unint*)calloc( KMAX, sizeof(unint*) );
+  unint *total = (unint*)calloc( q.r, sizeof(unint) );
 
-   //calc overlap
-  for(i=0; i<m; i++){
-    //get rep:
+  for( i=0; i<q.r; i++ ){
     unint ri = NNs[i];
-    tol[i] = vorS.groupCount[ri];
-    for(j=0; j<vorS.groupCount[ri]; j++){
-      for(k=0; k<KMAX; k++){
-	ol[i] += ( vorS.xMap[ri][j] == trueNNs[IDX(i, k, 32)] );
-      }
-    }
+    total[i] = vorS.groupCount[ri];
+    for( j=0; j<vorS.groupCount[ri]; j++ )
+      for( k=1; k<= KMAX; k++ )
+	for( l=0; l<k; l++ )
+	  patk[i][k-1] += ( vorS.xMap[ri][j] == trueNNs[IDX( i, l, 32 )] );
   }
 
-  long unsigned int nc=0, tnc=0;
-  for(i=0;i<m;i++){
-    nc += ol[i];
-    tnc += tol[i];
+  long unsigned int *a_patk = (long unsigned int*)calloc(KMAX, sizeof(*a_patk));
+  long unsigned int a_total = 0;
+  for( i=0; i<q.r; i++ ){
+    a_total += total[i];
+    for( j=0; j<KMAX; j++ )
+      a_patk[j] += patk[i][j];
   }
-
-  double mean = ((double)nc)/((double)m);
-  double var = 0.0;
-  for(i=0;i<m;i++) {
-    var += (((double)ol[i])-mean)*(((double)ol[i])-mean)/((double)m);
-  }
-  printf("\tavg overlap = %6.4f/%d; std dev = %6.4f \n", mean, KMAX, sqrt(var));
   
-  double meanT = ((double)tnc)/((double)m);
+  double *mu = (double*)calloc(KMAX, sizeof(*mu));
+  double *sig2 = (double*)calloc(KMAX, sizeof(*sig2));
+  
+  for( i=0; i<KMAX; i++ )
+    mu[i] = ((double)a_patk[i])/((double)q.r);
+  for( i=0; i<q.r; i++ ){
+    for( j=0; j<KMAX; j++ )
+      sig2[j] += ((double)patk[i][j] - mu[j])*((double)patk[i][j] - mu[j])/((double)q.r);
+  }
+  
+  printf("avg patk: ");
+  for(i=0; i<KMAX; i++)
+    printf("%d: %6.3f ", i, mu[i]);
+  printf("\n");
+  
+  printf("var patk: ");
+  for(i=0; i<KMAX; i++)
+    printf("%d: %6.3f ", i, sqrt(sig2[i]));
+  printf("\n");
+  
+  double meanT = ((double)a_total)/((double)m);
   double varT = 0.0;
   for(i=0;i<m;i++) {
-    varT += (((double)tol[i])-meanT)*(((double)tol[i])-meanT)/((double)m);
+    varT += (((double)total[i])-meanT)*(((double)total[i])-meanT)/((double)m);
   }
   printf("\tnum dists = %6.4f; std dev = %6.4f \n", meanT, sqrt(varT));
   
   if(outFiletxt){
     FILE* fp = fopen(outFiletxt, "a");
-    fprintf( fp, "%d %6.5f %6.5f %6.5f %6.5f \n", numReps, mean, sqrt(var), meanT, sqrt(varT) );
+    fprintf( fp, "%d %6.5f %6.5f %6.5f ", numReps, meanT, sqrt(varT) );
+    for(i=0; i<KMAX; i++)
+      fprintf(fp,"%6.5f %6.5f ", mu[i], sqrt(sig2[i]));
+    fprintf(fp,"\n");
+    //    fprintf( fp, "%d %6.5f %6.5f %6.5f %6.5f \n", numReps, mean, sqrt(var), meanT, sqrt(varT) );
     fclose(fp);
   }
 
-  free(tol);
-  free(ol);
+  free(mu);
+  free(sig2);
+  free(a_patk);
+  free(total);
+  for( i=0; i<q.r; i++ )
+    free(patk[i]);
+  free(patk);
 }
 
 
