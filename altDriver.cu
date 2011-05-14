@@ -42,11 +42,11 @@ int main(int argc, char**argv){
   parseInput(argc,argv);
   
   gettimeofday( &tvB, NULL );
-  printf("Using GPU #%d\n",deviceNum); 
-  if(cudaSetDevice(deviceNum) != cudaSuccess){ 
-    printf("Unable to select device %d.. exiting. \n",deviceNum); 
-    exit(1); 
-  } 
+  /* printf("Using GPU #%d\n",deviceNum);  */
+  /* if(cudaSetDevice(deviceNum) != cudaSuccess){  */
+  /*   printf("Unable to select device %d.. exiting. \n",deviceNum);  */
+  /*   exit(1);  */
+  /* }  */
   
   size_t memFree, memTot;
   cudaMemGetInfo(&memFree, &memTot);
@@ -235,8 +235,6 @@ void evalNNerror(matrix x, matrix q, unint *NNs){
   struct timeval tvB, tvE;
   unint i;
 
-  
-
   printf("\nComputing error rates (this might take a while)\n");
   real *ranges = (real*)calloc(q.pr,sizeof(*ranges));
   for(i=0;i<q.r;i++){
@@ -261,8 +259,8 @@ void evalNNerror(matrix x, matrix q, unint *NNs){
   printf("\tavg rank = %6.4f; std dev = %6.4f \n\n", mean, sqrt(var));
   printf("(range count took %6.4f) \n", timeDiff(tvB, tvE));
   
-  if(outFile){
-    FILE* fp = fopen(outFile, "a");
+  if(outFiletxt){
+    FILE* fp = fopen(outFiletxt, "a");
     fprintf( fp, "%d %6.5f %6.5f \n", numReps, mean, sqrt(var) );
     fclose(fp);
   }
@@ -315,13 +313,19 @@ void evalKNNerror(matrix q, unint *NNs, vorStruct vorS){
   }
   printf("\tavg overlap = %6.4f/%d; std dev = %6.4f \n", mean, KMAX, sqrt(var));
   
-  mean = ((double)tnc)/((double)m);
-  var = 0.0;
+  double meanT = ((double)tnc)/((double)m);
+  double varT = 0.0;
   for(i=0;i<m;i++) {
-    var += (((double)tol[i])-mean)*(((double)tol[i])-mean)/((double)m);
+    varT += (((double)tol[i])-meanT)*(((double)tol[i])-meanT)/((double)m);
   }
-  printf("\tnum dists = %6.4f/%d; std dev = %6.4f \n", mean, KMAX, sqrt(var));
+  printf("\tnum dists = %6.4f; std dev = %6.4f \n", meanT, sqrt(varT));
   
+  if(outFiletxt){
+    FILE* fp = fopen(outFiletxt, "a");
+    fprintf( fp, "%d %6.5f %6.5f %6.5f %6.5f \n", numReps, mean, sqrt(var), meanT, sqrt(varT) );
+    fclose(fp);
+  }
+
   free(tol);
   free(ol);
 }
