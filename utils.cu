@@ -17,18 +17,18 @@
 void subRandPerm(unint l, unint n, unint *x){
   unint i,ri, *y;
   y = (unint*)calloc(n,sizeof(*y));
-    
   struct timeval t3;
   gettimeofday(&t3,NULL);
   srand(t3.tv_usec);
   
   for(i=0;i<n;i++)
     y[i]=i;
-  
+
   for(i=0;i<MIN(l,n-1);i++){  //The n-1 bit is necessary because you can't swap the last 
                               //element with something larger.
     ri=randBetween(i+1,n);
     swap(&y[i],&y[ri]);
+
   }
   
   for(i=0;i<l;i++)
@@ -197,18 +197,40 @@ double timeDiff(struct timeval start, struct timeval end){
 //reads num rows from x, starting at row.  place them
 //in xmem, starting at rowOff
 void readBlock( matrix xmem, unint rowOff, hdMatrix x, unint row, unint num ){
-  long offset = ((long)row)*x.c*sizeof(real);
+  unint i,j;
+  
+  long offset = (x.format==IS_CHAR) ? sizeof(char) : sizeof(real);
+  offset *= ((long)row)*x.c;
   fseek( x.fp, offset, SEEK_SET );
 
-  unint i;
-  for( i=0; i<num; i++ ){
-    if( xmem.c != fread( &xmem.mat[IDX( rowOff+i, 0, xmem.ld )], sizeof(real), xmem.c, x.fp )){
-      fprintf( stderr, "error reading block\n");
-      exit(1);
+  if( x.format == IS_REAL ){
+    for( i=0; i<num; i++ ){
+      if( xmem.c != fread( &xmem.mat[IDX( rowOff+i, 0, xmem.ld )], sizeof(real), xmem.c, x.fp )){
+	fprintf( stderr, "error reading block\n");
+	exit(1);
+      }
     }
   }
+  else{
+    char *t = (char*)calloc( x.c, sizeof(*t) );
+    for( i=0; i<num; i++ ){
+      if( xmem.c != fread( t, sizeof(char), xmem.c, x.fp ) ){
+	fprintf( stderr, "error reading block\n");
+	exit(1);
+      }
+      for( j=0; j<xmem.c; j++ )
+	xmem.mat[IDX( rowOff+i, j, xmem.ld )] = (real)t[j];
+    }
+    free( t );
+  }
 }
-  
+
+void writeBlock( FILE *fp, intMatrix x ){
+  if( sizeOfIntMat(x) != fwrite( x.mat, sizeof(*x.mat), sizeOfIntMat(x), fp ) ){
+    fprintf(stderr, "error writing block of xmap \n");
+    exit(1);
+  }
+}
 
 
 #endif

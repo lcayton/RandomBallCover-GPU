@@ -104,13 +104,19 @@ typedef struct {
 typedef struct {
   matrix r;
   unint **xMap;
+  FILE *map_fp;
+  char filename[25];
   unint *groupCount;
 } vorStruct;
 
+
+#define IS_REAL 0
+#define IS_CHAR 1
 
 typedef struct {
   unint r;
   unint c;
   FILE *fp;
+  char format;
 } hdMatrix;
 #endif

@@ -24,13 +24,12 @@ void evalKNNerror(matrix,unint*,vorStruct);
 void writeNeighbs(char*,char*,intMatrix,matrix);
 
 char *dataFileX, *dataFileQ, *dataFileXtxt, *dataFileQtxt, *outFile, *outFiletxt, *nnFile;
+char dataFormat = IS_REAL;
 char runBrute=0, runEval=0;
 unint n=0, m=0, d=0, numReps=0, deviceNum=0;
 
 int main(int argc, char**argv){
-  matrix x, q;
-  intMatrix nnsRBC;
-  matrix distsRBC;
+  matrix q;
   struct timeval tvB,tvE;
   cudaError_t cE;
   vorStruct vorS;
@@ -58,15 +57,10 @@ int main(int argc, char**argv){
   initMat( &q, m, d );
   q.mat = (real*)calloc( sizeOfMat(q), sizeof(*(q.mat)) );
   
-  
-  if( dataFileQtxt )
-    readDataText( dataFileQtxt, q );
-  else
-    readData( dataFileQ, q );
+  readData( dataFileQ, q );
 
   unint *nrs = (unint*)calloc( PAD(m), sizeof(*nrs));
   
-
   //Try the alternative method out
   hdMatrix hdx;
   hdx.fp = fopen(dataFileX, "rb");
@@ -76,7 +70,9 @@ int main(int argc, char**argv){
   }
   hdx.r = n;
   hdx.c = d;
+  hdx.format = dataFormat;
 
+  
   printf("[alt]building the rbc..\n");
   gettimeofday( &tvB, NULL );
   //unint ol = (unint)(((double)numReps)*numReps/((double)n));
@@ -112,7 +108,7 @@ int main(int argc, char**argv){
 void parseInput(int argc, char **argv){
   int i=1;
   if(argc <= 1){
-    printf("\nusage: \n  testRBC -x datafileX -q datafileQ  -n numPts (DB) -m numQueries -d dim -r numReps [-o outFile] [-g GPU num] [-b] [-e]\n\n");
+    printf("\nusage: \n  testRBC -x datafileX -q datafileQ  -n numPts (DB) -m numQueries -d dim -r numReps [-o outFile] [-g GPU num] [-b] [-e] [-c]\n\n");
     printf("\tdatafileX    = binary file containing the database\n");
     printf("\tdatafileQ    = binary file containing the queries\n");
     printf("\tnumPts       = size of database\n");
@@ -123,6 +119,7 @@ void parseInput(int argc, char **argv){
     printf("\tGPU num      = ID # of the GPU to use (optional) for multi-GPU machines\n");
     printf("\n\tuse -b to run brute force in addition the RBC\n");
     printf("\tuse -e to run the evaluation routine (implicitly runs brute force)\n");
+    printf("\tuse -c if data is stored as chars (otherwise assumed to be reals\n");
     printf("\n\n\tTo input/output data in text format (instead of bin), use the \n\t-X and -Q and -O switches in place of -x and -q and -o (respectively).\n");
     printf("\n\n");
     exit(0);
@@ -157,6 +154,8 @@ void parseInput(int argc, char **argv){
       runBrute=1;
     else if(!strcmp(argv[i], "-e"))
       runEval=1;
+    else if(!strcmp(argv[i], "-c"))
+      dataFormat = IS_CHAR;
     else{
       fprintf(stderr,"%s : unrecognized option.. exiting\n",argv[i]);
       exit(1);
@@ -184,23 +183,39 @@ void parseInput(int argc, char **argv){
 
 
 void readData(char *dataFile, matrix x){
-  unint i;
+  unint i, j;
   FILE *fp;
   unint numRead;
 
-  fp = fopen(dataFile,"r");
+  fp = fopen(dataFile,"rb");
   if(fp==NULL){
     fprintf(stderr,"error opening file.. exiting\n");
     exit(1);
   }
     
-  for( i=0; i<x.r; i++ ){ //can't load everything in one fread
-                           //because matrix is padded.
-    numRead = fread( &x.mat[IDX( i, 0, x.ld )], sizeof(real), x.c, fp );
-    if(numRead != x.c){
-      fprintf(stderr,"error reading file.. exiting \n");
-      exit(1);
+  if(dataFormat == IS_REAL){
+    for( i=0; i<x.r; i++ ){ //can't load everything in one fread
+      //because matrix is padded.
+      numRead = fread( &x.mat[IDX( i, 0, x.ld )], sizeof(real), x.c, fp );
+      if(numRead != x.c){
+	fprintf(stderr,"error reading file.. exiting \n");
+	exit(1);
+      }
     }
+  }
+  else{
+    char *t = (char*)calloc( x.c, sizeof(*t) );
+    for( i=0; i<x.r; i++ ){ //can't load everything in one fread
+      //because matrix is padded.
+      numRead = fread( t, sizeof(char), x.c, fp );
+      if(numRead != x.c){
+	fprintf(stderr,"error reading file.. exiting \n");
+	exit(1);
+      }
+      for( j=0; j<x.c; j++ )
+	x.mat[IDX( i, j, x.ld )] = (real)t[j];
+    }
+    free( t );
   }
   fclose(fp);
 }
@@ -285,19 +300,41 @@ void evalKNNerror(matrix q, unint *NNs, vorStruct vorS){
   }
   fclose( fp );
 
+  unint s=vorS.r.r;
+  unint *txmap = (unint*)calloc( s, sizeof(*txmap) );
+
   unint **patk = (unint**)calloc( q.r, sizeof(unint*) );
   for( i=0; i<q.r; i++ )
     patk[i] = (unint*)calloc( KMAX, sizeof(unint*) );
   unint *total = (unint*)calloc( q.r, sizeof(unint) );
 
+  fp = fopen( vorS.filename, "rb" );
+  if(!fp){
+    printf("error opening vorS file \n");
+    exit(1);
+  }
+
   for( i=0; i<q.r; i++ ){
     unint ri = NNs[i];
     total[i] = vorS.groupCount[ri];
-    for( j=0; j<vorS.groupCount[ri]; j++ )
+
+    if( fseek( fp, ri*s*sizeof(unint), SEEK_SET ) ){
+      fprintf(stderr,"problem with fseek \n");
+      exit(1);
+    }
+      
+    if( total[i] != fread( txmap, sizeof(*txmap), total[i], fp ) ){
+      fprintf(stderr,"problem reading xmap\n"); 
+      exit(1); 
+    }
+
+    for( j=0; j<total[i]; j++ )
       for( k=1; k<= KMAX; k++ )
 	for( l=0; l<k; l++ )
-	  patk[i][k-1] += ( vorS.xMap[ri][j] == trueNNs[IDX( i, l, 32 )] );
+	  patk[i][k-1] += ( txmap[j] == trueNNs[IDX( i, l, 32 )] );
   }
+
+  fclose(fp);
 
   long unsigned int *a_patk = (long unsigned int*)calloc(KMAX, sizeof(*a_patk));
   long unsigned int a_total = 0;
@@ -336,11 +373,11 @@ void evalKNNerror(matrix q, unint *NNs, vorStruct vorS){
   
   if(outFiletxt){
     FILE* fp = fopen(outFiletxt, "a");
-    fprintf( fp, "%d %6.5f %6.5f %6.5f ", numReps, meanT, sqrt(varT) );
+    fprintf( fp, "%d %6.5f %6.5f %6.5f ", numReps, meanT, sqrt(varT), 0.0 );
     for(i=0; i<KMAX; i++)
       fprintf(fp,"%6.5f %6.5f ", mu[i], sqrt(sig2[i]));
     fprintf(fp,"\n");
-    //    fprintf( fp, "%d %6.5f %6.5f %6.5f %6.5f \n", numReps, mean, sqrt(var), meanT, sqrt(varT) );
+   
     fclose(fp);
   }
 
@@ -351,6 +388,7 @@ void evalKNNerror(matrix q, unint *NNs, vorStruct vorS){
   for( i=0; i<q.r; i++ )
     free(patk[i]);
   free(patk);
+  free(txmap);
 }
 
 

@@ -392,7 +392,7 @@ void buildBigRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
     unint numLeft = n;
     unint row = 0; //current row of x
     unint pi, pip;
-    unint its=0;
+    //unint its=0;
     while( numLeft > 0 ){
       pi = MIN( ptsAtOnce, numLeft );
       pip = PAD( pi );
@@ -443,12 +443,22 @@ void buildBigRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
 void buildBigOneShot( const hdMatrix x, vorStruct *vorS, unint numReps, unint s){
   unint i,j;
   unint n = x.r; 
-
+  
   setupRepsVorHD( x, vorS, numReps );
+  
+  struct timeval tvB;
+  gettimeofday(&tvB,NULL);
+  sprintf(vorS->filename, "%lu%lu.bin",tvB.tv_sec,tvB.tv_usec);
+  vorS->map_fp = fopen(vorS->filename, "wb");
+  
+  intMatrix xMap;
+  initIntMat( &xMap, RPI, s );
+  xMap.mat = (unint*)calloc( sizeOfIntMat(xMap), sizeof(*xMap.mat) );
+  
+  /* vorS->xMap = (unint**)calloc( numReps, sizeof(unint*) ); */
+  /* for( i=0; i<numReps; i++ ) */
+  /*   vorS->xMap[i] = (unint*)calloc( s, sizeof(unint) ); */
 
-  vorS->xMap = (unint**)calloc( numReps, sizeof(unint*) );
-  for( i=0; i<numReps; i++ )
-    vorS->xMap[i] = (unint*)calloc( s, sizeof(unint) );
   vorS->groupCount = (unint*)calloc( PAD(numReps), sizeof(*vorS->groupCount) );
   for( i=0; i<numReps; i++ )
     vorS->groupCount[i] = PAD(s);
@@ -523,8 +533,12 @@ void buildBigOneShot( const hdMatrix x, vorStruct *vorS, unint numReps, unint s)
     }
     
     for( j=0; j<RPI; j++ )
-      cudaMemcpy( vorS->xMap[i*RPI+j], &dI.mat[IDX( j, 0, dI.ld )], s*sizeof(unint), cudaMemcpyDeviceToHost );
+      cudaMemcpy( &xMap.mat[IDX( j, 0, xMap.ld )], &dI.mat[IDX( j, 0, dI.ld )], s*sizeof(unint), cudaMemcpyDeviceToHost );
+    writeBlock( vorS->map_fp, xMap );
+    
+      //      cudaMemcpy( vorS->xMap[i*RPI+j], &dI.mat[IDX( j, 0, dI.ld )], s*sizeof(unint), cudaMemcpyDeviceToHost );
   }
+  fclose( vorS->map_fp );
   
   free( zeros.mat );
   cudaFree( dr.mat );
@@ -665,7 +679,7 @@ void setupRepsVorHD(hdMatrix x, vorStruct *vorS, unint numReps){
   unint *randInds;
   randInds = (unint*)calloc( PAD(numReps), sizeof(*randInds) );
   subRandPerm(numReps, x.r, randInds);
-  
+
   initMat( &vorS->r, numReps, x.c );
   vorS->r.mat = (real*)calloc( sizeOfMat(vorS->r), sizeof(*(vorS->r.mat)) );
   
@@ -817,12 +831,10 @@ void destroyRBC(rbcStruct *rbcS){
 
 
 void destroyVor(vorStruct *vorS){
-  unint i;
-  for( i=0; i<vorS->r.r; i++ )
-    free( vorS->xMap[i] );
-  free( vorS->xMap );
+    
   free( vorS->r.mat );
   free( vorS->groupCount );
+  remove( vorS->filename );
 }
 
 
