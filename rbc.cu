@@ -448,7 +448,7 @@ void buildBigOneShot( const hdMatrix x, vorStruct *vorS, unint numReps, unint s)
   
   struct timeval tvB;
   gettimeofday(&tvB,NULL);
-  sprintf(vorS->filename, "%lu%lu.bin",tvB.tv_sec,tvB.tv_usec);
+  sprintf(vorS->filename, "/local_data/lcayton/temp/%lu%lu.bin",tvB.tv_sec,tvB.tv_usec);
   vorS->map_fp = fopen(vorS->filename, "wb");
   
   intMatrix xMap;
