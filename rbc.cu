@@ -529,7 +529,7 @@ void buildBigOneShot( const hdMatrix x, vorStruct *vorS, unint numReps, unint s)
     
       numLeft -= pi;
       row += pi;
-      printf("\t it %d finished; %d points left\n", its++, numLeft); 
+      printf("\t it %d finished; %d points left\r", its++, numLeft); 
     }
     
     for( j=0; j<RPI; j++ )

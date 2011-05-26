@@ -310,7 +310,7 @@ void evalKNNerror(matrix q, unint *NNs, vorStruct vorS){
 
   fp = fopen( vorS.filename, "rb" );
   if(!fp){
-    printf("error opening vorS file \n");
+    printf("error opening vorS file %s\n",vorS.filename);
     exit(1);
   }
 

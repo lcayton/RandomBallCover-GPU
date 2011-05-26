@@ -105,7 +105,7 @@ typedef struct {
   matrix r;
   unint **xMap;
   FILE *map_fp;
-  char filename[25];
+  char filename[150];
   unint *groupCount;
 } vorStruct;
 
