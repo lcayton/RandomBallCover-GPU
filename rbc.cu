@@ -207,7 +207,7 @@ void buildRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
 
 
 // Choose representatives and move them to device
-void setupReps(matrix x, rbcStruct *rbcS, int numReps){
+void setupReps(matrix x, rbcStruct *rbcS, unint numReps){
   unint i;
   unint *randInds;
   randInds = (unint*)calloc( PAD(numReps), sizeof(*randInds) );

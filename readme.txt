@@ -1,4 +1,4 @@
- ***Random Ball Cover (RBC) v0.2.4***
+ ***Random Ball Cover (RBC) v0.2.5***
 Lawrence Cayton
 lcayton@tuebingen.mpg.de
 
@@ -119,7 +119,11 @@ typedef double real;
 typedef float real;
 #define MAX_REAL FLT_MAX
 
-  Then, you must do a 
+  Then, you must add the compiler flag
+-arch=sm_20
+  to the NVCCFLAGS line of the Makefile (or sm_13 for older GPUs).
+
+  Finally, do a 
 $ make clean
   followed by another make.
 

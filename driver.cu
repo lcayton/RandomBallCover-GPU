@@ -225,7 +225,7 @@ void readData(char *dataFile, matrix x){
 void readDataText(char *dataFile, matrix x){
   FILE *fp;
   double t;
-  int i,j;
+  unint i,j;
 
   fp = fopen(dataFile,"r");
   if(fp==NULL){

@@ -23,6 +23,6 @@ void initCompPlan(compPlan*,charMatrix,unint*,unint*,unint);
 void freeCompPlan(compPlan*);
 void computeNNs(matrix,intMatrix,matrix,unint*,compPlan,unint*,real*,unint);
 void computeKNNs(matrix,intMatrix,matrix,unint*,compPlan,intMatrix,matrix,unint);
-void setupReps(matrix,rbcStruct*,int);
+void setupReps(matrix,rbcStruct*,unint);
 
 #endif
