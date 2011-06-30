@@ -37,7 +37,7 @@ typedef float real;
 #define DUMMY_IDX UINT_MAX
 
 //Row major indexing
-#define IDX(i,j,ld) (((i)*(ld))+(j))
+#define IDX(i,j,ld) (((size_t)(i)*(ld))+(j))
 
 //increase an int to the next multiple of BLOCK_SIZE
 #define PAD(i) ( ((i)%BLOCK_SIZE)==0 ? (i):((i)/BLOCK_SIZE)*BLOCK_SIZE+BLOCK_SIZE ) 

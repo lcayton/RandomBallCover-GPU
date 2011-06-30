@@ -90,7 +90,7 @@ __global__ void planNNKernel(const matrix Q, const unint *qMap, const matrix X, 
 //This is indentical to the planNNkernel, except that it maintains a list of 32-NNs.  At 
 //each iteration-chunk, the next 16 distances are computed, then sorted, then merged 
 //with the previously computed 32-NNs.
-__global__ void planKNNKernel(const matrix Q, const unint *qMap, const matrix X, const intMatrix xMap, matrix dMins, intMatrix dMinIDs, compPlan cP,  unint qStartPos ){
+__global__ void planKNNKernel(const matrix Q, const unint *qMap, const matrix X, const intMatrix xMap, matrix dMins, intMatrix dMinIDs, compPlan cP, unint qStartPos ){
   unint qB = qStartPos + blockIdx.y * BLOCK_SIZE;  //indexes Q
   unint xB; //X (DB) Block;
   unint cB; //column Block

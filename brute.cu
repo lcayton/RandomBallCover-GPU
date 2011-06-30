@@ -45,17 +45,25 @@ void bruteSearch(matrix x, matrix q, unint *NNs){
   unint *dMinIDs;
   matrix dx, dq;
 
-  
-  dx.r=x.r; dx.pr=x.pr; dx.c=x.c; dx.pc=x.pc; dx.ld=x.ld;
-  dq.r=q.r; dq.pr=q.pr; dq.c=q.c; dq.pc=q.pc; dq.ld=q.ld;
+  initMat( &dx, x.r, x.c );
+  initMat( &dq, q.r, q.c );
+  //  dx.r=x.r; dx.pr=x.pr; dx.c=x.c; dx.pc=x.pc; dx.ld=x.ld;
+  //  dq.r=q.r; dq.pr=q.pr; dq.c=q.c; dq.pc=q.pc; dq.ld=q.ld;
 
   checkErr( cudaMalloc((void**)&dMins, q.pr*sizeof(*dMins)) );
   checkErr( cudaMalloc((void**)&dMinIDs, q.pr*sizeof(*dMinIDs)) );
-  checkErr( cudaMalloc((void**)&dx.mat, dx.pr*dx.pc*sizeof(*dx.mat)) );
-  checkErr( cudaMalloc((void**)&dq.mat, dq.pr*dq.pc*sizeof(*dq.mat)) );
 
-  cudaMemcpy(dx.mat,x.mat,x.pr*x.pc*sizeof(*dx.mat),cudaMemcpyHostToDevice);
-  cudaMemcpy(dq.mat,q.mat,q.pr*q.pc*sizeof(*dq.mat),cudaMemcpyHostToDevice);
+
+  checkErr( cudaMalloc((void**)&dx.mat, sizeOfMatB(dx) ) ); 
+  checkErr( cudaMalloc((void**)&dq.mat, sizeOfMatB(dq) ) );
+
+  //checkErr( cudaMalloc((void**)&dx.mat, dx.pr*dx.pc*sizeof(*dx.mat)) );
+  // checkErr( cudaMalloc((void**)&dq.mat, dq.pr*dq.pc*sizeof(*dq.mat)) );
+  
+  cudaMemcpy(dx.mat,x.mat,sizeOfMatB(x),cudaMemcpyHostToDevice);
+  cudaMemcpy(dq.mat,q.mat,sizeOfMatB(q),cudaMemcpyHostToDevice);
+  //  cudaMemcpy(dx.mat,x.mat,x.pr*x.pc*sizeof(*dx.mat),cudaMemcpyHostToDevice);
+  //  cudaMemcpy(dq.mat,q.mat,q.pr*q.pc*sizeof(*dq.mat),cudaMemcpyHostToDevice);
   
   nnWrap(dq,dx,dMins,dMinIDs);
 

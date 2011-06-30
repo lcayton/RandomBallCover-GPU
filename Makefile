@@ -1,6 +1,6 @@
 CC=gcc
 NVCC=nvcc
-NVCCFLAGS=-O3
+NVCCFLAGS=-O3 --compiler-options=-Wall
 # sometimes useful flags: -arch=sm_20 --ptxas-options=-v -g -G
 # Note that you will need to specify an arch (as above) if you wish to use
 # double precision

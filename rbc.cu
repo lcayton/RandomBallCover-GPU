@@ -515,11 +515,11 @@ void buildBigOneShot( const hdMatrix x, vorStruct *vorS, unint numReps, unint s)
       pip = PAD( pi );
       
       readBlock(xmem, 0, x, row, pi);
-      cudaMemcpy( dx.mat, xmem.mat, pi*xmem.pc*sizeof(*xmem.mat), cudaMemcpyHostToDevice );
+      cudaMemcpy( dx.mat, xmem.mat, sizeof(*xmem.mat)*pi*xmem.pc, cudaMemcpyHostToDevice );
       dx.r = pi; dx.pr = pip;
       
       if( pip-pi )
-	cudaMemcpy( &dx.mat[IDX( pi, 0, dx.ld )], zeros.mat, (pip-pi)*dx.pc*sizeof(*zeros.mat), cudaMemcpyHostToDevice );
+	cudaMemcpy( &dx.mat[IDX( pi, 0, dx.ld )], zeros.mat, sizeof(*zeros.mat)*(pip-pi)*dx.pc, cudaMemcpyHostToDevice );
 
       //compute distances between dr and dx.  store them starting in column s.
       //store the indices of the xs in dI, starting from row.
@@ -529,7 +529,7 @@ void buildBigOneShot( const hdMatrix x, vorStruct *vorS, unint numReps, unint s)
     
       numLeft -= pi;
       row += pi;
-      printf("\t it %d finished; %d points left\r", its++, numLeft); 
+      printf("\t it %d finished; %d points left\n", its++, numLeft); 
     }
     
     for( j=0; j<RPI; j++ )
@@ -918,7 +918,7 @@ void sortDists( matrix dD, intMatrix dI ){
     thrust::device_ptr<float> dPtr( &dD.mat[IDX( i, 0, dD.ld )] );
     thrust::device_ptr<unint> iPtr( &dI.mat[IDX( i, 0, dI.ld )] );
   
-    thrust::sort_by_key( dPtr, dPtr+dD.c, iPtr);
+    thrust::sort_by_key( dPtr, dPtr+((size_t)dD.c), iPtr);
   }
 
 }

@@ -224,7 +224,7 @@ void readData(char *dataFile, matrix x){
 void readDataText(char *dataFile, matrix x){
   FILE *fp;
   real t;
-  int i,j;
+  unint i,j;
 
   fp = fopen(dataFile,"r");
   if(fp==NULL){
@@ -288,7 +288,7 @@ void evalNNerror(matrix x, matrix q, unint *NNs){
 //evals the error rate of k-nns
 void evalKNNerror(matrix q, unint *NNs, vorStruct vorS){
   unint i,j,k,l;
-
+  
   unint m = q.r;
   printf("\nComputing error rates (this might take a while)\n");
   
@@ -315,7 +315,7 @@ void evalKNNerror(matrix q, unint *NNs, vorStruct vorS){
   }
 
   for( i=0; i<q.r; i++ ){
-    unint ri = NNs[i];
+    size_t ri = NNs[i];
     total[i] = vorS.groupCount[ri];
 
     if( fseek( fp, ri*s*sizeof(unint), SEEK_SET ) ){

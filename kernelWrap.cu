@@ -208,7 +208,7 @@ void offDistWrap( const matrix dr, const matrix dx, matrix dD, intMatrix dI, uni
   dim3 block(BLOCK_SIZE,BLOCK_SIZE);
   dim3 grid;
   
-  unint todoX, todoY, numDoneX, numDoneY;
+  size_t todoX, todoY, numDoneX, numDoneY;
 
   numDoneX = 0;
   while ( numDoneX < dx.pr ){
