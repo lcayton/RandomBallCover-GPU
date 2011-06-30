@@ -152,9 +152,9 @@ void parseInput(int argc, char **argv){
     else if(!strcmp(argv[i], "-q"))
       dataFileQ = argv[++i];
     else if(!strcmp(argv[i], "-X"))
-      dataFileX = argv[++i];
+      dataFileXtxt = argv[++i];
     else if(!strcmp(argv[i], "-Q"))
-      dataFileQ = argv[++i];
+      dataFileQtxt = argv[++i];
     else if(!strcmp(argv[i], "-n"))
       n = atoi(argv[++i]);
     else if(!strcmp(argv[i], "-m"))
@@ -224,7 +224,7 @@ void readData(char *dataFile, matrix x){
 
 void readDataText(char *dataFile, matrix x){
   FILE *fp;
-  real t;
+  double t;
   int i,j;
 
   fp = fopen(dataFile,"r");
@@ -235,7 +235,7 @@ void readDataText(char *dataFile, matrix x){
     
   for(i=0; i<x.r; i++){
     for(j=0; j<x.c; j++){
-      if(fscanf(fp,"%f ", &t)==EOF){
+      if(fscanf(fp,"%lf ", &t)==EOF){
 	fprintf(stderr,"error reading file.. exiting \n");
 	exit(1);
       }

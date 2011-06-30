@@ -164,11 +164,11 @@ void initIntMat(intMatrix *x, unint r, unint c){
 
 // returns the size of a matrix in bytes
 size_t sizeOfMatB(matrix x){
-  return x.pr*x.pc*sizeof(*x.mat);
+  return ((size_t)x.pr)*x.pc*sizeof(*x.mat);
 }
 
 size_t sizeOfIntMatB(intMatrix x){
-  return x.pr*x.pc*sizeof(*x.mat);
+  return ((size_t)x.pr)*x.pc*sizeof(*x.mat);
 }
 // returns the numbers of elements in a matrix
 size_t sizeOfMat(matrix x){

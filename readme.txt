@@ -114,14 +114,14 @@ MISC NOTES ON THE CODE
 typedef double real;
 #define MAX_REAL DBL_MAX
 
-and comment out the lines
+  and comment out the lines
 
 typedef float real;
 #define MAX_REAL FLT_MAX
 
-Then, you must do a 
+  Then, you must do a 
 $ make clean
-followed by another make.
+  followed by another make.
 
 * For the most part, device variables (ie arrays residing on the GPU)
   begin with a lowercase d.  For example, the device version of the 
