@@ -2,7 +2,7 @@
 Lawrence Cayton
 work@lcayton.com
 
-(C) Copyright 2010, Lawrence Cayton [lcayton@tuebingen.mpg.de]
+(C) Copyright 2010, Lawrence Cayton [work@lcayton.com]
  
 This program is free software: you can redistribute it and/or modify 
 it under the terms of the GNU General Public License as published by
