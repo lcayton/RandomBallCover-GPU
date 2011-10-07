@@ -1,6 +1,6 @@
- ***Random Ball Cover (RBC) v0.2.5***
+ ***Random Ball Cover (RBC) v0.2.6***
 Lawrence Cayton
-lcayton@tuebingen.mpg.de
+work@lcayton.com
 
 (C) Copyright 2010, Lawrence Cayton [lcayton@tuebingen.mpg.de]
  
