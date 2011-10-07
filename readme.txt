@@ -48,6 +48,11 @@ A sample driver is provided for the RBC.  To try it out, type
 $ testRBC
 at the prompt and a list of options will be displayed.
 
+The sample driver can be used with either text or binary input.  The
+text input format is one database element per line, with features
+separated by spaces.  The binary input format is in floats, but can be
+changed to doubles.  
+
 The output file format is a list of the queries' NNs,
 followed by a list of the distances to those NNs.  Note that by
 default, all input and output is stored in single-precision (float)
@@ -66,6 +71,23 @@ generally 5*sqrt(n), where n is the number of database points.  Use
 the eval option (-e) to print out the error rate.  See the paper
 (Cayton, 2011) for detailed information on this parameter. 
 
+The sample_input directory contains examples in both binary and
+text.  The sample_db set contains 1024 points, each of which has 16
+dimensions.  The sample_query set contains 128 sample queries (which
+of course also have 16 dimensions).  To try it out, run 
+
+$ testRBC -X sample_input/sample_db.txt -Q sample_input/sample_queries.txt -n 1024 -m 128 -d 16 -r 128
+
+or to try it out with the binary files, run
+
+$ testRBC -x sample_input/sample_db.bin -q sample_input/sample_queries.bin -n 1024 -m 128 -d 16 -r 128
+
+Note that the -r 128 descibes the number of representatives, which
+controls the accuracy of the search.  You might try varying this
+parameter to see the effects (there is nothing special about 128).
+You can print out the accuracy using by adding the -e switch; this
+will say the average number of the 32 nearest neighbors that were
+actually returned.  
 
 ---------------------------------------------------------------------
 FILES
@@ -80,6 +102,7 @@ FILES
 * kernelWrap.{h,cu} -- CPU wrapper code around the kernels.
 * rbc.{h,cu} -- the core of the RBC data structure.  Includes the
   implementation of build and search algorithms.
+* rbc_include.h -- header file to include in your driver.
 * sKernel.{h,cu} -- implementation of the kernel functions related to
   the parallel scan algorithm (used within the build method).
 * sKernelWrap.{h,cu} -- wrappers for the kernels in sKernel.

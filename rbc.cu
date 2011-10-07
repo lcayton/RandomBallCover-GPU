@@ -178,6 +178,7 @@ void buildRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
   unint numLeft = rbcS->dr.r; //points left to process
   unint row = 0; //base row for iteration of while loop
   unint pi, pip; //pi=pts per it, pip=pad(pi)
+
   while( numLeft > 0 ){
     pi = MIN(ptsAtOnce, numLeft);  //points to do this iteration.
     pip = PAD(pi);
@@ -196,6 +197,7 @@ void buildRBC(const matrix x, rbcStruct *rbcS, unint numReps, unint s){
     row += pi;
   }
   
+
   cudaFree(dCnts);
   free(ir.mat);
   free(xmap.mat);

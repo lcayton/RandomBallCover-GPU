@@ -45,26 +45,20 @@ void bruteSearch(matrix x, matrix q, unint *NNs){
   unint *dMinIDs;
   matrix dx, dq;
 
-  
-  dx.r=x.r; dx.pr=x.pr; dx.c=x.c; dx.pc=x.pc; dx.ld=x.ld;
-  dq.r=q.r; dq.pr=q.pr; dq.c=q.c; dq.pc=q.pc; dq.ld=q.ld;
+  copyAndMove( &dx, &x );
+  copyAndMove( &dq, &q );
 
   checkErr( cudaMalloc((void**)&dMins, q.pr*sizeof(*dMins)) );
   checkErr( cudaMalloc((void**)&dMinIDs, q.pr*sizeof(*dMinIDs)) );
-  checkErr( cudaMalloc((void**)&dx.mat, dx.pr*dx.pc*sizeof(*dx.mat)) );
-  checkErr( cudaMalloc((void**)&dq.mat, dq.pr*dq.pc*sizeof(*dq.mat)) );
-
-  cudaMemcpy(dx.mat,x.mat,x.pr*x.pc*sizeof(*dx.mat),cudaMemcpyHostToDevice);
-  cudaMemcpy(dq.mat,q.mat,q.pr*q.pc*sizeof(*dq.mat),cudaMemcpyHostToDevice);
   
-  nnWrap(dq,dx,dMins,dMinIDs);
+  nnWrap( dq, dx, dMins, dMinIDs );
 
-  cudaMemcpy(NNs,dMinIDs,dq.r*sizeof(*NNs),cudaMemcpyDeviceToHost);
+  cudaMemcpy( NNs, dMinIDs, dq.r*sizeof(*NNs), cudaMemcpyDeviceToHost );
   
-  cudaFree(dMins);
-  cudaFree(dMinIDs);
-  cudaFree(dx.mat);
-  cudaFree(dq.mat);
+  cudaFree( dMins );
+  cudaFree( dMinIDs );
+  cudaFree( dx.mat );
+  cudaFree( dq.mat );
 }
 
 
@@ -73,28 +67,24 @@ void bruteK(matrix x, matrix q, intMatrix NNs, matrix NNdists){
   intMatrix dMinIDs;
   matrix dx, dq;
   
-  dx.r=x.r; dx.pr=x.pr; dx.c=x.c; dx.pc=x.pc; dx.ld=x.ld;
-  dq.r=q.r; dq.pr=q.pr; dq.c=q.c; dq.pc=q.pc; dq.ld=q.ld;
-  dNNdists.r=q.r; dNNdists.pr=q.pr; dNNdists.c=KMAX; dNNdists.pc=KMAX; dNNdists.ld=dNNdists.pc;
-  dMinIDs.r=q.r; dMinIDs.pr=q.pr; dMinIDs.c=KMAX; dMinIDs.pc=KMAX; dMinIDs.ld=dMinIDs.pc;
-
-  checkErr( cudaMalloc((void**)&dNNdists.mat, dNNdists.pc*dNNdists.pr*sizeof(*dNNdists.mat)) );
-  checkErr( cudaMalloc((void**)&dMinIDs.mat, dMinIDs.pc*dMinIDs.pr*sizeof(*dMinIDs.mat)) );
-  checkErr( cudaMalloc((void**)&dx.mat, dx.pr*dx.pc*sizeof(*dx.mat)) );
-  checkErr( cudaMalloc((void**)&dq.mat, dq.pr*dq.pc*sizeof(*dq.mat)) );
-
-  cudaMemcpy(dx.mat,x.mat,x.pr*x.pc*sizeof(*dx.mat),cudaMemcpyHostToDevice);
-  cudaMemcpy(dq.mat,q.mat,q.pr*q.pc*sizeof(*dq.mat),cudaMemcpyHostToDevice);
+  copyAndMove( &dx, &x );
+  copyAndMove( &dq, &q );
   
-  knnWrap(dq,dx,dNNdists,dMinIDs);
+  initMat( &dNNdists, q.r, KMAX );
+  checkErr( cudaMalloc((void**)&dNNdists.mat, sizeOfMatB(dNNdists) ) );
 
-  cudaMemcpy(NNs.mat,dMinIDs.mat,NNs.pr*NNs.pc*sizeof(*NNs.mat),cudaMemcpyDeviceToHost);
-  cudaMemcpy(NNdists.mat,dNNdists.mat,NNdists.pr*NNdists.pc*sizeof(*NNdists.mat),cudaMemcpyDeviceToHost);
+  initIntMat( &dMinIDs, q.r, KMAX );
+  checkErr( cudaMalloc((void**)&dMinIDs.mat, sizeOfIntMatB(dMinIDs) ) );
 
-  cudaFree(dNNdists.mat);
-  cudaFree(dMinIDs.mat);
-  cudaFree(dx.mat);
-  cudaFree(dq.mat);
+  knnWrap( dq, dx, dNNdists, dMinIDs );
+
+  cudaMemcpy( NNs.mat, dMinIDs.mat, sizeOfIntMatB(NNs), cudaMemcpyDeviceToHost );
+  cudaMemcpy( NNdists.mat, dNNdists.mat, sizeOfMatB(NNdists), cudaMemcpyDeviceToHost );
+  
+  cudaFree( dNNdists.mat );
+  cudaFree( dMinIDs.mat );
+  cudaFree( dx.mat );
+  cudaFree( dq.mat );
 }
 
 

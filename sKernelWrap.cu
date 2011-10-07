@@ -44,7 +44,7 @@ void buildMapWrap(intMatrix map, charMatrix ir, intMatrix sums, unint offSet){
 
 
 void sumWrap(charMatrix in, intMatrix sum){
-  unint i; 
+  int i; 
   unint todo, numDone, temp;
   unint n = in.c;
   unint numScans = (n+SCAN_WIDTH-1)/SCAN_WIDTH;

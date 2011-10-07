@@ -4,15 +4,9 @@
 
 #include<stdio.h>
 #include<stdlib.h>
-#include<cuda.h>
 #include<sys/time.h>
-#include<math.h>
-#include "defs.h"
-#include "utils.h"
-#include "utilsGPU.h"
-#include "rbc.h"
-#include "brute.h"
-#include "sKernel.h"
+
+#include "rbc_include.h"
 
 void parseInput(int,char**);
 void readData(char*,matrix);
@@ -40,11 +34,11 @@ int main(int argc, char**argv){
   parseInput(argc,argv);
   
   gettimeofday( &tvB, NULL );
-  printf("Using GPU #%d\n",deviceNum); 
-  if(cudaSetDevice(deviceNum) != cudaSuccess){ 
-    printf("Unable to select device %d.. exiting. \n",deviceNum); 
-    exit(1); 
-  } 
+  printf("Using GPU #%d\n",deviceNum);  
+  if(cudaSetDevice(deviceNum) != cudaSuccess){  
+    printf("Unable to select device %d.. exiting. \n",deviceNum);  
+    exit(1);  
+  }  
   
   size_t memFree, memTot;
   cudaMemGetInfo(&memFree, &memTot);
@@ -89,6 +83,7 @@ int main(int argc, char**argv){
   gettimeofday( &tvE, NULL );
   printf( "\t.. query time for krbc = %6.4f \n", timeDiff(tvB,tvE) );
   
+  //Shows how to run brute force search
   if( runBrute ){
     intMatrix nnsBrute;
     matrix distsBrute;
@@ -136,7 +131,7 @@ void parseInput(int argc, char **argv){
     printf("\tnumPts       = size of database\n");
     printf("\tnumQueries   = number of queries\n");
     printf("\tdim          = dimensionality\n");
-    printf("\tnumReps      = number of representatives\n");
+    printf("\tnumReps      = number of representatives (must be at least 32)\n");
     printf("\toutFile      = binary output file (optional)\n");
     printf("\tGPU num      = ID # of the GPU to use (optional) for multi-GPU machines\n");
     printf("\n\tuse -b to run brute force in addition the RBC\n");
@@ -192,8 +187,12 @@ void parseInput(int argc, char **argv){
     fprintf(stderr,"you can only give one database file and one query file.. exiting\n");
     exit(1); 
   }
-  if(numReps>n){
+  if( numReps>n ){
     fprintf(stderr,"can't have more representatives than points.. exiting\n");
+    exit(1);
+  }
+  if( numReps<32 ){
+    fprintf(stderr, "number of representatives must be at least 32\n");
     exit(1);
   }
 }
@@ -275,12 +274,6 @@ void evalNNerror(matrix x, matrix q, unint *NNs){
   printf("\tavg rank = %6.4f; std dev = %6.4f \n\n", mean, sqrt(var));
   printf("(range count took %6.4f) \n", timeDiff(tvB, tvE));
   
-  if(outFile){
-    FILE* fp = fopen(outFile, "a");
-    fprintf( fp, "%d %6.5f %6.5f \n", numReps, mean, sqrt(var) );
-    fclose(fp);
-  }
-
   free(ranges);
   free(cnts);
 }
@@ -297,11 +290,12 @@ void evalKNNerror(matrix x, matrix q, intMatrix NNs){
   unint *ol = (unint*)calloc( q.r, sizeof(*ol) );
   
   intMatrix NNsB;
-  NNsB.r=q.r; NNsB.pr=q.pr; NNsB.c=NNsB.pc=32; NNsB.ld=NNsB.pc;
-  NNsB.mat = (unint*)calloc( NNsB.pr*NNsB.pc, sizeof(*NNsB.mat) );
   matrix distsBrute;
-  distsBrute.r=q.r; distsBrute.pr=q.pr; distsBrute.c=distsBrute.pc=KMAX; distsBrute.ld=distsBrute.pc;
-  distsBrute.mat = (real*)calloc( distsBrute.pr*distsBrute.pc, sizeof(*distsBrute.mat) );
+
+  initIntMat( &NNsB, q.r, KMAX );
+  initMat( &distsBrute, q.r, KMAX );
+  NNsB.mat = (unint*)calloc( sizeOfIntMat(NNsB), sizeof(*NNsB.mat) );
+  distsBrute.mat = (real*)calloc( sizeOfMat(distsBrute), sizeof(*distsBrute.mat) );
 
   gettimeofday(&tvB,NULL);
   bruteK(x,q,NNsB,distsBrute);
@@ -328,17 +322,11 @@ void evalKNNerror(matrix x, matrix q, intMatrix NNs){
   }
   printf("\tavg overlap = %6.4f/%d; std dev = %6.4f \n", mean, KMAX, sqrt(var));
 
-  FILE* fp;
-  if(outFile){
-    fp = fopen(outFile, "a");
-    fprintf( fp, "%d %6.5f %6.5f ", numReps, mean, sqrt(var) );
-  }
-
   real *ranges = (real*)calloc(q.pr,sizeof(*ranges));
   for(i=0;i<q.r;i++){
     ranges[i] = distVec(q,x,i,NNs.mat[IDX(i, KMAX-1, NNs.ld)]);
   }
-  
+    
   unint *cnts = (unint*)calloc(q.pr,sizeof(*cnts));
   bruteRangeCount(x,q,ranges,cnts);
   
@@ -353,11 +341,6 @@ void evalKNNerror(matrix x, matrix q, intMatrix NNs){
   }
   printf("\tavg actual rank of 32nd NN returned by the RBC = %6.4f; std dev = %6.4f \n\n", mean, sqrt(var));
   printf("(brute k-nn took %6.4f) \n", timeDiff(tvB, tvE));
-
-  if(outFile){
-    fprintf( fp, "%6.5f %6.5f \n", mean, sqrt(var) );
-    fclose(fp);
-  }
 
   free(cnts);
   free(ol);
