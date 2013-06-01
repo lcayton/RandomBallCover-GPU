@@ -31,7 +31,8 @@ algorithm and the theory behind it.
 * L. Cayton, A nearest neighbor data structure for graphics hardware.
 ADMS, 2010.
 * L. Cayton, Accelerating nearest neighbor search on manycore systems.
-Submitted, 2011. 
+Twenty-Sixth IEEE International Parallel and Distributed Processing 
+Symposium (IPDPS), 2012.
 
 
 ---------------------------------------------------------------------
@@ -69,7 +70,7 @@ search quality and search speed.  The best way to set this parameter
 is to try a few different values out; a good starting point is
 generally 5*sqrt(n), where n is the number of database points.  Use
 the eval option (-e) to print out the error rate.  See the paper
-(Cayton, 2011) for detailed information on this parameter. 
+(Cayton, 2012) for detailed information on this parameter. 
 
 The sample_input directory contains examples in both binary and
 text.  The sample_db set contains 1024 points, each of which has 16
